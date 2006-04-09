@@ -3,6 +3,8 @@
 
 Type level integers.
 
+> module TypeLevelInteger where
+
 We implement sum type using separate data types for each contrustor
 and type class for the whole sum. Data types are made instances
 of this type class. So we get type level sum type.
@@ -81,6 +83,33 @@ corresponding class instance.
 > instance (PeanoMinus a b c) => PeanoMinus (Succ a) (Succ b) c where
 >     peanoMinus (Succ a) (Succ b) = peanoMinus a b
 
+    peanoRem :: Peano -> Peano -> Z
+    peanoRem a b = peanoRem' b One a b
+
+> class (PeanoRem' b One a b c) => PeanoRem a b c | a b -> c where
+>     peanoRem :: a -> b -> c
+
+> instance (PeanoRem' b One a b c) => PeanoRem a b c where
+>     peanoRem a b = peanoRem' b One a b
+
+    peanoRem' :: Peano -> Peano -> Peano -> Peano -> Z
+    peanoRem' r acc One One = Zero
+    peanoRem' r acc One (Succ b) = Pos acc
+    peanoRem' r acc (Succ a) One = peanoRem' r One a r
+    peanoRem' r acc (Succ a) (Succ b) = peanoRem' r (Succ acc) a b
+
+> class (Peano r, Peano acc, Peano a, Peano b, Z c) => PeanoRem' r acc a b c | r acc a b -> c where
+>     peanoRem' :: r -> acc -> a -> b -> c
+
+> instance (Peano r, Peano acc) => PeanoRem' r acc One One Zero where
+>     peanoRem' r acc One One = Zero
+> instance (Peano r, Peano acc, Peano b) => PeanoRem' r acc One (Succ b) (Pos acc) where
+>     peanoRem' r acc One (Succ b) = Pos acc
+> instance (Peano r, Peano acc, PeanoRem' r One a r c) => PeanoRem' r acc (Succ a) One c where
+>     peanoRem' r acc (Succ a) One = peanoRem' r One a r
+> instance (Peano r, Peano acc, PeanoRem' r (Succ acc) a b c) => PeanoRem' r acc (Succ a) (Succ b) c where
+>     peanoRem' r acc (Succ a) (Succ b) = peanoRem' r (Succ acc) a b
+
     plus :: Z -> Z -> Z
     plus Zero b = b
     plus a Zero = a
@@ -155,6 +184,45 @@ corresponding class instance.
 >     multiply (Pos a) (Neg b) = Neg (peanoMultiply a b)
 > instance PeanoMultiply a b c => Multiply (Pos a) (Pos b) (Pos c) where
 >     multiply (Pos a) (Pos b) = Pos (peanoMultiply a b)
+
+    zabs :: Z -> Z
+    zabs Zero = Zero
+    zabs (Pos a) = Pos a
+    zabs (Neg a) = Pos a   
+
+> class (Z a, Z b) => ZAbs a b | a -> b where
+>     zabs :: a -> b
+
+> instance ZAbs Zero Zero where
+>     zabs Zero = Zero
+> instance Peano a => ZAbs (Pos a) (Pos a) where
+>     zabs (Pos a) = (Pos a)
+> instance Peano a => ZAbs (Neg a) (Pos a) where
+>     zabs (Neg a) = (Pos a)
+
+    zgcd :: Z -> Z -> Peano
+    zgcd a b = zgcd' (zabs a) (zabs b)
+
+> class (Z a, Z b, Peano c) => ZGcd a b c | a b -> c where
+>     zgcd :: a -> b -> c
+
+> instance (ZAbs a b, ZAbs c d, ZGcd' b d e) => ZGcd a c e where
+>     zgcd a b = zgcd' (zabs a) (zabs b)
+
+    zgcd' :: Z -> Z -> Peano
+    zgcd' (Pos a) Zero = a
+    zgcd' Zero (Pos b) = b
+    zgcd' (Pos a) (Pos b) = zgcd' (Pos b) (peanoRem a b)
+
+> class (Z a, Z b, Peano c) => ZGcd' a b c | a b -> c where
+>     zgcd' :: a -> b -> c
+
+> instance Peano a => ZGcd' (Pos a) Zero a where
+>     zgcd' (Pos a) Zero = a
+> instance Peano b => ZGcd' Zero (Pos b) b where
+>     zgcd' Zero (Pos b) = b
+> instance (PeanoRem a b c, ZGcd' (Pos b) c d) => ZGcd' (Pos a) (Pos b) d where
+>     zgcd' (Pos a) (Pos b) = zgcd' (Pos b) (peanoRem a b)
 
 
 At the end we define utility function asInteger which return Haskell Integer
