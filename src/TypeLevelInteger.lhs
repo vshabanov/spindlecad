@@ -110,80 +110,80 @@ corresponding class instance.
 > instance (Peano r, Peano acc, PeanoRem' r (Succ acc) a b c) => PeanoRem' r acc (Succ a) (Succ b) c where
 >     peanoRem' r acc (Succ a) (Succ b) = peanoRem' r (Succ acc) a b
 
-    plus :: Z -> Z -> Z
-    plus Zero b = b
-    plus a Zero = a
-    plus (Neg a) (Neg b) = Neg (peanoPlus a b)
-    plus (Neg a) (Pos b) = peanoMinus b a
-    plus (Pos a) (Neg b) = peanoMinus a b
-    plus (Pos a) (Pos b) = Pos (peanoPlus a b)
+    zplus :: Z -> Z -> Z
+    zplus Zero b = b
+    zplus a Zero = a
+    zplus (Neg a) (Neg b) = Neg (peanoPlus a b)
+    zplus (Neg a) (Pos b) = peanoMinus b a
+    zplus (Pos a) (Neg b) = peanoMinus a b
+    zplus (Pos a) (Pos b) = Pos (peanoPlus a b)
 
-> class (Z a, Z b, Z c) => Plus a b c | a b -> c where
->     plus :: a -> b -> c
+> class (Z a, Z b, Z c) => ZPlus a b c | a b -> c where
+>     zplus :: a -> b -> c
 
-> instance Z b => Plus Zero b b where
->     plus Zero b = b
-> instance Z a => Plus a Zero a where
->     plus a Zero = a
-> instance PeanoPlus a b c => Plus (Neg a) (Neg b) (Neg c) where
->     plus (Neg a) (Neg b) = Neg (peanoPlus a b)
-> instance PeanoMinus b a c => Plus (Neg a) (Pos b) c where
->     plus (Neg a) (Pos b) = peanoMinus b a
-> instance PeanoMinus a b c => Plus (Pos a) (Neg b) c where
->     plus (Pos a) (Neg b) = peanoMinus a b
-> instance PeanoPlus a b c => Plus (Pos a) (Pos b) (Pos c) where
->     plus (Pos a) (Pos b) = Pos (peanoPlus a b)
+> instance Z b => ZPlus Zero b b where
+>     zplus Zero b = b
+> instance Z a => ZPlus a Zero a where
+>     zplus a Zero = a
+> instance PeanoPlus a b c => ZPlus (Neg a) (Neg b) (Neg c) where
+>     zplus (Neg a) (Neg b) = Neg (peanoPlus a b)
+> instance PeanoMinus b a c => ZPlus (Neg a) (Pos b) c where
+>     zplus (Neg a) (Pos b) = peanoMinus b a
+> instance PeanoMinus a b c => ZPlus (Pos a) (Neg b) c where
+>     zplus (Pos a) (Neg b) = peanoMinus a b
+> instance PeanoPlus a b c => ZPlus (Pos a) (Pos b) (Pos c) where
+>     zplus (Pos a) (Pos b) = Pos (peanoPlus a b)
 
-    negate :: Z -> Z
-    negate Zero = Zero
-    negate (Pos a) = (Neg a)
-    negate (Neg a) = (Pos a)
+    znegate :: Z -> Z
+    znegate Zero = Zero
+    znegate (Pos a) = (Neg a)
+    znegate (Neg a) = (Pos a)
 
-> class (Z a, Z b) => Negate a b | a -> b where
->     neg :: a -> b
+> class (Z a, Z b) => ZNegate a b | a -> b where
+>     znegate :: a -> b
 
-> instance Negate Zero Zero where
->     neg Zero = Zero
-> instance Peano a => Negate (Pos a) (Neg a) where
->     neg (Pos a) = (Neg a)
-> instance Peano a => Negate (Neg a) (Pos a) where
->     neg (Neg a) = (Pos a)
+> instance ZNegate Zero Zero where
+>     znegate Zero = Zero
+> instance Peano a => ZNegate (Pos a) (Neg a) where
+>     znegate (Pos a) = (Neg a)
+> instance Peano a => ZNegate (Neg a) (Pos a) where
+>     znegate (Neg a) = (Pos a)
 
-    minus :: Z -> Z -> Z
-    minus a Zero = a
-    minus a b = plus a (neg b)
+    zminus :: Z -> Z -> Z
+    zminus a Zero = a
+    zminus a b = zplus a (neg b)
 
-> class (Z a, Z b, Z c) => Minus a b c | a b -> c where
->     minus :: a -> b -> c
+> class (Z a, Z b, Z c) => ZMinus a b c | a b -> c where
+>     zminus :: a -> b -> c
 
-> instance Z a => Minus a Zero a where
->     minus a Zero = a
-> instance (Peano b, Negate b nb, Plus a nb c) => Minus a b c where
->     minus a b = plus a (neg b)
+> instance Z a => ZMinus a Zero a where
+>     zminus a Zero = a
+> instance (Peano b, ZNegate b nb, ZPlus a nb c) => ZMinus a b c where
+>     zminus a b = zplus a (znegate b)
 
-    multiply :: Z -> Z -> Z
-    multiply Zero _ = Zero
-    multiply _ Zero = Zero
-    multiply (Neg a) (Neg b) = Pos (peanoMultiply a b)
-    multiply (Neg a) (Pos b) = Neg (peanoMultiply a b)
-    multiply (Pos a) (Neg b) = Neg (peanoMultiply a b)
-    multiply (Pos a) (Pos b) = Pos (peanoMultiply a b)
+    zmultiply :: Z -> Z -> Z
+    zmultiply Zero _ = Zero
+    zmultiply _ Zero = Zero
+    zmultiply (Neg a) (Neg b) = Pos (peanoMultiply a b)
+    zmultiply (Neg a) (Pos b) = Neg (peanoMultiply a b)
+    zmultiply (Pos a) (Neg b) = Neg (peanoMultiply a b)
+    zmultiply (Pos a) (Pos b) = Pos (peanoMultiply a b)
 
-> class (Z a, Z b, Z c) => Multiply a b c | a b -> c where
->     multiply :: a -> b -> c
+> class (Z a, Z b, Z c) => ZMultiply a b c | a b -> c where
+>     zmultiply :: a -> b -> c
 
-> instance Z b => Multiply Zero b Zero where
->     multiply Zero _ = Zero
-> instance Z a => Multiply a Zero Zero where
->     multiply _ Zero = Zero
-> instance PeanoMultiply a b c => Multiply (Neg a) (Neg b) (Pos c) where
->     multiply (Neg a) (Neg b) = Pos (peanoMultiply a b)
-> instance PeanoMultiply a b c => Multiply (Neg a) (Pos b) (Neg c) where
->     multiply (Neg a) (Pos b) = Neg (peanoMultiply a b)
-> instance PeanoMultiply a b c => Multiply (Pos a) (Neg b) (Neg c) where
->     multiply (Pos a) (Neg b) = Neg (peanoMultiply a b)
-> instance PeanoMultiply a b c => Multiply (Pos a) (Pos b) (Pos c) where
->     multiply (Pos a) (Pos b) = Pos (peanoMultiply a b)
+> instance Z b => ZMultiply Zero b Zero where
+>     zmultiply Zero _ = Zero
+> instance Z a => ZMultiply a Zero Zero where
+>     zmultiply _ Zero = Zero
+> instance PeanoMultiply a b c => ZMultiply (Neg a) (Neg b) (Pos c) where
+>     zmultiply (Neg a) (Neg b) = Pos (peanoMultiply a b)
+> instance PeanoMultiply a b c => ZMultiply (Neg a) (Pos b) (Neg c) where
+>     zmultiply (Neg a) (Pos b) = Neg (peanoMultiply a b)
+> instance PeanoMultiply a b c => ZMultiply (Pos a) (Neg b) (Neg c) where
+>     zmultiply (Pos a) (Neg b) = Neg (peanoMultiply a b)
+> instance PeanoMultiply a b c => ZMultiply (Pos a) (Pos b) (Pos c) where
+>     zmultiply (Pos a) (Pos b) = Pos (peanoMultiply a b)
 
     zabs :: Z -> Z
     zabs Zero = Zero
@@ -257,8 +257,8 @@ Num and Show class instances for function level integers code test.
                       | otherwise = error "peano numbers starts from One"
 
     instance Num Z where
-        a + b = plus a b
-        negate a = minus Zero a
+        a + b = zplus a b
+        znegate a = zminus Zero a
         fromInteger n | n > 0  = Pos (fromInteger n)
                       | n < 0  = Neg (fromInteger (-n))
                       | otherwise = Zero
