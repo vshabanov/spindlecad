@@ -83,6 +83,33 @@ corresponding class instance.
 > instance (PeanoMinus a b c) => PeanoMinus (Succ a) (Succ b) c where
 >     peanoMinus (Succ a) (Succ b) = peanoMinus a b
 
+    peanoDiv :: Peano -> Peano -> Z
+    peanoDiv a b = peanoDiv' b Zero a b
+
+> class (PeanoDiv' b Zero a b c) => PeanoDiv a b c | a b -> c where
+>     peanoDiv :: a -> b -> c
+
+> instance (PeanoDiv' b Zero a b c) => PeanoDiv a b c where
+>     peanoDiv a b = peanoDiv' b Zero a b
+
+    peanoDiv' :: Peano -> Z -> Peano -> Peano -> Z
+    peanoDiv' d acc One One = acc `zplus` Pos One
+    peanoDiv' d acc One (Succ b) = acc
+    peanoDiv' d acc (Succ a) One = peanoDiv' d (acc `zplus` Pos One) a d
+    peanoDiv' d acc (Succ a) (Succ b) = peanoDiv' d acc a b
+
+> class (Peano d, Z acc, Peano a, Peano b, Z c) => PeanoDiv' d acc a b c | d acc a b -> c where
+>     peanoDiv' :: d -> acc -> a -> b -> c
+
+> instance (Peano d, ZPlus acc (Pos One) acc1) => PeanoDiv' d acc One One acc1 where
+>     peanoDiv' d acc One One = acc `zplus` Pos One
+> instance (Peano d, Z acc, Peano b) => PeanoDiv' d acc One (Succ b) acc where
+>     peanoDiv' d acc One (Succ b) = acc
+> instance (Peano d, ZPlus acc (Pos One) acc1, PeanoDiv' d acc1 a d c) => PeanoDiv' d acc (Succ a) One c where
+>     peanoDiv' d acc (Succ a) One = peanoDiv' d (acc `zplus` Pos One) a d
+> instance (Peano d, Z acc, PeanoDiv' d acc a b c) => PeanoDiv' d acc (Succ a) (Succ b) c where
+>     peanoDiv' d acc (Succ a) (Succ b) = peanoDiv' d acc a b
+
     peanoRem :: Peano -> Peano -> Z
     peanoRem a b = peanoRem' b One a b
 
@@ -150,14 +177,11 @@ corresponding class instance.
 >     znegate (Neg a) = (Pos a)
 
     zminus :: Z -> Z -> Z
-    zminus a Zero = a
     zminus a b = zplus a (neg b)
 
 > class (Z a, Z b, Z c) => ZMinus a b c | a b -> c where
 >     zminus :: a -> b -> c
 
-> instance Z a => ZMinus a Zero a where
->     zminus a Zero = a
 > instance (Peano b, ZNegate b nb, ZPlus a nb c) => ZMinus a b c where
 >     zminus a b = zplus a (znegate b)
 
@@ -184,6 +208,31 @@ corresponding class instance.
 >     zmultiply (Pos a) (Neg b) = Neg (peanoMultiply a b)
 > instance PeanoMultiply a b c => ZMultiply (Pos a) (Pos b) (Pos c) where
 >     zmultiply (Pos a) (Pos b) = Pos (peanoMultiply a b)
+
+    zdiv :: Z -> Z -> Z
+    zdiv Zero (Pos _) = Zero
+    zdiv Zero (Neg _) = Zero
+    zdiv (Neg a) (Neg b) = peanoDiv a b
+    zdiv (Neg a) (Pos b) = znegate (peanoDiv a b)
+    zdiv (Pos a) (Neg b) = znegate (peanoDiv a b)
+    zdiv (Pos a) (Pos b) = peanoDiv a b
+    -- zdiv _ Zero is undefined
+
+> class (Z a, Z b, Z c) => ZDiv a b c | a b -> c where
+>     zdiv :: a -> b -> c
+
+> instance Peano b => ZDiv Zero (Pos b) Zero where
+>     zdiv Zero (Pos _) = Zero
+> instance Peano a => ZDiv Zero (Neg a) Zero where
+>     zdiv Zero (Neg _) = Zero
+> instance PeanoDiv a b c => ZDiv (Neg a) (Neg b) c where
+>     zdiv (Neg a) (Neg b) = peanoDiv a b
+> instance (PeanoDiv a b c, ZNegate c c1) => ZDiv (Neg a) (Pos b) c1 where
+>     zdiv (Neg a) (Pos b) = znegate (peanoDiv a b)
+> instance (PeanoDiv a b c, ZNegate c c1) => ZDiv (Pos a) (Neg b) c1 where
+>     zdiv (Pos a) (Neg b) = znegate (peanoDiv a b)
+> instance PeanoDiv a b c => ZDiv (Pos a) (Pos b) c where
+>     zdiv (Pos a) (Pos b) = peanoDiv a b
 
     zabs :: Z -> Z
     zabs Zero = Zero
@@ -213,6 +262,9 @@ corresponding class instance.
     zgcd' (Pos a) Zero = a
     zgcd' Zero (Pos b) = b
     zgcd' (Pos a) (Pos b) = zgcd' (Pos b) (peanoRem a b)
+    -- zgcd' Zero Zero is undefined
+    -- zgcd' (Neg _) _
+    -- zgcd' _ (Neg _) is undefine (zgcd' never called with negative values)
 
 > class (Z a, Z b, Peano c) => ZGcd' a b c | a b -> c where
 >     zgcd' :: a -> b -> c
@@ -244,31 +296,3 @@ representation for type level integer.
 
 
 The End.
-
-
-Some test code below...
-
-Num and Show class instances for function level integers code test.
-
-    instance Num Peano where
-        a + b = peanoPlus a b
-        fromInteger n | n > 1     = Succ (fromInteger (n-1))
-                      | n == 1    = One 
-                      | otherwise = error "peano numbers starts from One"
-
-    instance Num Z where
-        a + b = zplus a b
-        znegate a = zminus Zero a
-        fromInteger n | n > 0  = Pos (fromInteger n)
-                      | n < 0  = Neg (fromInteger (-n))
-                      | otherwise = Zero
-
-    instance Show Peano where
-        show = show . toInt 0
-            where toInt acc One = acc + 1
-                  toInt acc (Succ a) = toInt (acc + 1) a
-
-    instance Show Z where
-        show Zero = "0"
-        show (Pos n) = show n
-        show (Neg n) = '-' : show n
