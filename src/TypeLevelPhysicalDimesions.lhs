@@ -3,7 +3,7 @@
 
 Type level representation of physical dimenstions.
 
-> module PhysicalDimensions where
+> module TypeLevelPhysicalDimensions where
 
 The dimension is represented as tuple containing powers of all basic SI units.
 Powers are type level numbers from
