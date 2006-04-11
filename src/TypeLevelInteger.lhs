@@ -138,8 +138,11 @@ corresponding class instance.
 >     peanoRem' r acc (Succ a) (Succ b) = peanoRem' r (Succ acc) a b
 
     zplus :: Z -> Z -> Z
-    zplus Zero b = b
-    zplus a Zero = a
+    zplus Zero Zero = Zero
+    zplus Zero (Pos b) = (Pos b)
+    zplus Zero (Neg b) = (Neg b)
+    zplus (Pos a) Zero = (Pos a)
+    zplus (Neg a) Zero = (Neg a)
     zplus (Neg a) (Neg b) = Neg (peanoPlus a b)
     zplus (Neg a) (Pos b) = peanoMinus b a
     zplus (Pos a) (Neg b) = peanoMinus a b
@@ -148,10 +151,16 @@ corresponding class instance.
 > class (Z a, Z b, Z c) => ZPlus a b c | a b -> c where
 >     zplus :: a -> b -> c
 
-> instance Z b => ZPlus Zero b b where
->     zplus Zero b = b
-> instance Z a => ZPlus a Zero a where
->     zplus a Zero = a
+> instance ZPlus Zero Zero Zero where
+>     zplus Zero Zero = Zero
+> instance Peano b => ZPlus Zero (Pos b) (Pos b) where
+>     zplus Zero (Pos b) = (Pos b)
+> instance Peano b => ZPlus Zero (Neg b) (Neg b) where
+>     zplus Zero (Neg b) = (Neg b)
+> instance Peano a => ZPlus (Pos a) Zero (Pos a) where
+>     zplus (Pos a) Zero = (Pos a)
+> instance Peano a => ZPlus (Neg a) Zero (Neg a) where
+>     zplus (Neg a) Zero = (Neg a)
 > instance PeanoPlus a b c => ZPlus (Neg a) (Neg b) (Neg c) where
 >     zplus (Neg a) (Neg b) = Neg (peanoPlus a b)
 > instance PeanoMinus b a c => ZPlus (Neg a) (Pos b) c where
