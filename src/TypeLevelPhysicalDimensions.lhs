@@ -55,13 +55,13 @@ operation on dimensions (multiplication, division, exponentiation).
 >                                    deriving (Eq, Show, Read)
 
 
-> dmeter    = Dimension One  Zero Zero Zero Zero Zero Zero
-> dkilogram = Dimension Zero One  Zero Zero Zero Zero Zero
-> dsecond   = Dimension Zero Zero One  Zero Zero Zero Zero
-> dampere   = Dimension Zero Zero Zero One  Zero Zero Zero
-> dkelvin   = Dimension Zero Zero Zero Zero One  Zero Zero
-> dmole     = Dimension Zero Zero Zero Zero Zero One  Zero
-> dcandela  = Dimension Zero Zero Zero Zero Zero Zero One  
+> type Meter    = Dimension One  Zero Zero Zero Zero Zero Zero
+> type Kilogram = Dimension Zero One  Zero Zero Zero Zero Zero
+> type Second   = Dimension Zero Zero One  Zero Zero Zero Zero
+> type Ampere   = Dimension Zero Zero Zero One  Zero Zero Zero
+> type Kelvin   = Dimension Zero Zero Zero Zero One  Zero Zero
+> type Mole     = Dimension Zero Zero Zero Zero Zero One  Zero
+> type Candela  = Dimension Zero Zero Zero Zero Zero Zero One  
 
 
 > dimensionMultiply a b =
