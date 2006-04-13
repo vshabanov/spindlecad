@@ -10,6 +10,7 @@ Powers are type level numbers from
 
 > import TypeLevelInteger
 > import TypeLevelRatio
+> import TypeLevelBoolean
 
 Definitions of the Seven Basic SI Units:
 
@@ -54,6 +55,7 @@ operation on dimensions (multiplication, division, exponentiation).
 > data Dimension m kg s a k mol cd = Dimension m kg s a k mol cd
 >                                    deriving (Eq, Show, Read)
 
+> type NonDim   = Dimension Zero Zero Zero Zero Zero Zero Zero
 
 > type Meter    = Dimension One  Zero Zero Zero Zero Zero Zero
 > type Kilogram = Dimension Zero One  Zero Zero Zero Zero Zero
@@ -63,33 +65,100 @@ operation on dimensions (multiplication, division, exponentiation).
 > type Mole     = Dimension Zero Zero Zero Zero Zero One  Zero
 > type Candela  = Dimension Zero Zero Zero Zero Zero Zero One  
 
+The functions here (and above) can be defined as ordinary Haskell functions
+(without class/instance pair) but for use in other classes its better to make
+them type class also.
 
-> dimensionMultiply a b =
->     dimensionSimplify
->     (Dimension
->      (am `qplus` bm) (akg `qplus` bkg) (as `qplus` bs)
->      (aa `qplus` ba) (ak `qplus` bk) (amol `qplus` bmol) (acd `qplus` bcd))
->         where Dimension am akg as aa ak amol acd = dimensionAsQ a
->               Dimension bm bkg bs ba bk bmol bcd = dimensionAsQ b
+> class DimensionMultiply a b c | a b -> c where
+>     dimensionMultiply :: a -> b -> c
 
-> dimensionDivide a b =
->     dimensionSimplify
->     (Dimension
->      (am `qminus` bm) (akg `qminus` bkg) (as `qminus` bs)
->      (aa `qminus` ba) (ak `qminus` bk) (amol `qminus` bmol) (acd `qminus` bcd))
->         where Dimension am akg as aa ak amol acd = dimensionAsQ a
->               Dimension bm bkg bs ba bk bmol bcd = dimensionAsQ b
+> instance (DimensionAsQ (Dimension m1 kg1 s1 a1 k1 mol1 cd1)
+>           (Dimension am akg as aa ak amol acd),
+>           DimensionAsQ (Dimension m2 kg2 s2 a2 k2 mol2 cd2)
+>           (Dimension bm bkg bs ba bk bmol bcd),
+>           DimensionSimplify (Dimension m kg s a k mol cd)
+>           (Dimension mr kgr sr ar kr molr cdr),
+>           QPlus am bm m, QPlus akg bkg kg, QPlus as bs s,
+>           QPlus aa ba a, QPlus ak bk k, QPlus amol bmol mol, QPlus acd bcd cd,
+>           -- all things below added because of 'could not deduce' error
+>           Simplify m mr, Simplify kg kgr, Simplify s sr, Simplify a ar,
+>           Simplify k kr, Simplify mol molr, Simplify cd cdr,
+>           AsQ m1 am, AsQ kg1 akg, AsQ s1 as, AsQ a1 aa,
+>           AsQ k1 ak, AsQ mol1 amol, AsQ cd1 acd,
+>           AsQ m2 bm, AsQ kg2 bkg, AsQ s2 bs, AsQ a2 ba,
+>           AsQ k2 bk, AsQ mol2 bmol, AsQ cd2 bcd--,
+>          )
+>     => DimensionMultiply
+>            (Dimension m1 kg1 s1 a1 k1 mol1 cd1)
+>            (Dimension m2 kg2 s2 a2 k2 mol2 cd2)
+>            (Dimension mr kgr sr ar kr molr cdr) where
+>     dimensionMultiply a b =
+>         dimensionSimplify
+>         (Dimension
+>          (am `qplus` bm) (akg `qplus` bkg) (as `qplus` bs)
+>          (aa `qplus` ba) (ak `qplus` bk) (amol `qplus` bmol) (acd `qplus` bcd))
+>             where Dimension am akg as aa ak amol acd = dimensionAsQ a
+>                   Dimension bm bkg bs ba bk bmol bcd = dimensionAsQ b
+
+> class DimensionDivide a b c | a b -> c where
+>     dimensionDivide :: a -> b -> c
+
+> instance (DimensionAsQ (Dimension m1 kg1 s1 a1 k1 mol1 cd1)
+>           (Dimension am akg as aa ak amol acd),
+>           DimensionAsQ (Dimension m2 kg2 s2 a2 k2 mol2 cd2)
+>           (Dimension bm bkg bs ba bk bmol bcd),
+>           DimensionSimplify (Dimension m kg s a k mol cd)
+>           (Dimension mr kgr sr ar kr molr cdr),
+>           QMinus am bm m, QMinus akg bkg kg, QMinus as bs s,
+>           QMinus aa ba a, QMinus ak bk k, QMinus amol bmol mol, QMinus acd bcd cd,
+>           -- all things below added because of 'could not deduce' error
+>           QPlus am nbm m, QPlus akg nbkg kg, QPlus as nbs s,
+>           QPlus aa nba a, QPlus ak nbk k, QPlus amol nbmol mol, QPlus acd nbcd cd,
+>           QNegate bm nbm, QNegate bkg nbkg, QNegate bs nbs,
+>           QNegate ba nba, QNegate bk nbk, QNegate bmol nbmol, QNegate bcd nbcd,
+>           Simplify m mr, Simplify kg kgr, Simplify s sr, Simplify a ar,
+>           Simplify k kr, Simplify mol molr, Simplify cd cdr,
+>           AsQ m1 am, AsQ kg1 akg, AsQ s1 as, AsQ a1 aa,
+>           AsQ k1 ak, AsQ mol1 amol, AsQ cd1 acd,
+>           AsQ m2 bm, AsQ kg2 bkg, AsQ s2 bs, AsQ a2 ba,
+>           AsQ k2 bk, AsQ mol2 bmol, AsQ cd2 bcd--,
+>          )
+>     => DimensionDivide
+>            (Dimension m1 kg1 s1 a1 k1 mol1 cd1)
+>            (Dimension m2 kg2 s2 a2 k2 mol2 cd2)
+>            (Dimension mr kgr sr ar kr molr cdr) where
+>     dimensionDivide a b =
+>         dimensionSimplify
+>         (Dimension
+>          (am `qminus` bm) (akg `qminus` bkg) (as `qminus` bs)
+>          (aa `qminus` ba) (ak `qminus` bk) (amol `qminus` bmol) (acd `qminus` bcd))
+>             where Dimension am akg as aa ak amol acd = dimensionAsQ a
+>                   Dimension bm bkg bs ba bk bmol bcd = dimensionAsQ b
 
 
 Some utility functions used to translate basic units powers in dimenstion
 to fractions and simplify them back.
 
-> dimensionAsQ (Dimension m kg s a k mol cd) =
->     Dimension (asQ m) (asQ kg) (asQ s) (asQ a) (asQ k) (asQ mol) (asQ cd)
+> class DimensionAsQ a b | a -> b where
+>     dimensionAsQ :: a -> b
 
-> dimensionSimplify (Dimension m kg s a k mol cd) =
->     Dimension (simplify m) (simplify kg) (simplify s)
->                   (simplify a) (simplify k) (simplify mol) (simplify cd)
+> instance (AsQ m m1, AsQ kg kg1, AsQ s s1, AsQ a a1,
+>           AsQ k k1, AsQ mol mol1, AsQ cd cd1)
+>     => DimensionAsQ (Dimension m kg s a k mol cd)
+>            (Dimension m1 kg1 s1 a1 k1 mol1 cd1) where
+>     dimensionAsQ (Dimension m kg s a k mol cd) =
+>         Dimension (asQ m) (asQ kg) (asQ s) (asQ a) (asQ k) (asQ mol) (asQ cd)
+
+> class DimensionSimplify a b | a -> b where
+>     dimensionSimplify :: a -> b
+
+> instance (Simplify m m1, Simplify kg kg1, Simplify s s1, Simplify a a1,
+>           Simplify k k1, Simplify mol mol1, Simplify cd cd1)
+>     => DimensionSimplify (Dimension m kg s a k mol cd)
+>            (Dimension m1 kg1 s1 a1 k1 mol1 cd1) where
+>     dimensionSimplify (Dimension m kg s a k mol cd) =
+>         Dimension (simplify m) (simplify kg) (simplify s)
+>                       (simplify a) (simplify k) (simplify mol) (simplify cd)
 
 
 To Z converter. Converts any type level number to rational fraction.
@@ -160,3 +229,26 @@ Type level number simplifier.
 >     simplifyOne (Q m One)  = simplify m
 > instance (Z m, Peano a) => SimplifyOne (Q m (Succ a)) (Q m (Succ a)) where
 >     simplifyOne (Q m (Succ a)) = (Q m (Succ a))
+
+Non-dimensional type level predicate
+
+> class (Boolean b) => Nondimensional a b | a -> b where
+>     nondimensional :: a -> b
+
+> instance (NonZero m mz, NonZero kg kgz, NonZero s sz, NonZero a az,
+>           NonZero k kz, NonZero mol molz, NonZero cd cdz,
+>           BOr mz kgz r1, BOr r1 sz r2, BOr r2 az r3,  BOr r3 kz r4,
+>           BOr r4 molz r5, BOr r5 cdz r,
+>           BNot r nr)
+>     => Nondimensional (Dimension m kg s a k mol cd) nr where
+>     nondimensional (Dimension m kg s a k mol cd) =
+>         bnot $ nonzero m `bor` nonzero kg `bor` nonzero s `bor` nonzero a
+>                  `bor` nonzero k `bor` nonzero mol `bor` nonzero cd
+
+Type value
+
+> instance (TypeValue m, TypeValue kg, TypeValue s, TypeValue a,
+>           TypeValue k, TypeValue mol, TypeValue cd)
+>     => TypeValue (Dimension m kg s a k mol cd) where
+>     typeValue = Dimension (typeValue :: m) (typeValue :: kg) (typeValue :: s)
+>         (typeValue :: a) (typeValue :: k) (typeValue :: mol) (typeValue :: cd)
