@@ -15,6 +15,7 @@ of equivalent pairs: (m,n)~(m',n') <=> mn'=m'n.
 For details of implementing function level code at type level see the
 
 > import TypeLevelInteger
+> import TypeLevelBoolean
 
 > import Data.Ratio -- for use in asRational
 
@@ -123,6 +124,20 @@ The code below is unmaintable - why Haskell can't deduce all these BlaBlaBla' ?
 >         where gcd = zgcd' (Pos m) (Pos n)
 >               Pos n1 = n `peanoDiv` gcd
 >               Pos m1 = m `peanoDiv` gcd
+
+Extension to non-zero type level predicate defined in TypeLevelInteger
+
+> instance (Peano n) => NonZero (Q Zero n) BFalse where
+>     nonzero (Q Zero n) = BFalse
+> instance (Peano m, Peano n) => NonZero (Q (Pos m) n) BTrue where
+>     nonzero (Q (Pos m) n) = BTrue
+> instance (Peano m, Peano n) => NonZero (Q (Neg m) n) BTrue where
+>     nonzero (Q (Neg m) n) = BTrue
+
+Type values
+
+> instance (TypeValue a, TypeValue b, Z a, Peano b) => TypeValue (Q a b) where
+>     typeValue = Q (typeValue :: a) (typeValue :: b)
 
 
 At the end we define utility function asRational which return Haskell Rational

@@ -5,6 +5,8 @@ Type level integers.
 
 > module TypeLevelInteger where
 
+> import TypeLevelBoolean
+
 We implement sum type using separate data types for each contrustor
 and type class for the whole sum. Data types are made instances
 of this type class. So we get type level sum type.
@@ -284,6 +286,35 @@ corresponding class instance.
 >     zgcd' Zero (Pos b) = b
 > instance (PeanoRem a b c, ZGcd' (Pos b) c d) => ZGcd' (Pos a) (Pos b) d where
 >     zgcd' (Pos a) (Pos b) = zgcd' (Pos b) (peanoRem a b)
+
+Non-zero type level predicate
+
+> class (Boolean b) => NonZero a b | a -> b where
+>     nonzero :: a -> b
+
+> instance NonZero Zero BFalse where
+>     nonzero Zero = BFalse
+> instance NonZero One BTrue where
+>     nonzero One = BTrue
+> instance Peano a => NonZero (Succ a) BTrue where
+>     nonzero (Succ a) = BTrue
+> instance Peano a => NonZero (Pos a) BTrue where
+>     nonzero (Pos a) = BTrue
+> instance Peano a => NonZero (Neg a) BTrue where
+>     nonzero (Neg a) = BTrue
+
+Type values
+
+> instance TypeValue One where
+>     typeValue = One
+> instance TypeValue a => TypeValue (Succ a) where
+>     typeValue = Succ (typeValue :: a)
+> instance TypeValue Zero where
+>     typeValue = Zero
+> instance TypeValue a => TypeValue (Pos a) where
+>     typeValue = Pos (typeValue :: a)
+> instance TypeValue a => TypeValue (Neg a) where
+>     typeValue = Neg (typeValue :: a)
 
 
 At the end we define utility function asInteger which return Haskell Integer
