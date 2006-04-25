@@ -157,7 +157,9 @@ CASExpr => Lisp.Value converter
 > toLisp (Integer i)    = Lisp.Integer i
 > toLisp (Rational r)   = Lisp.Rational r
 > toLisp (Double d)     = Lisp.Double d
-> toLisp (Symbol s)     = Lisp.Symbol ("`$" ++ s)
+> toLisp a@(Symbol s)   = if      a == cas_pi then Lisp.Symbol "`$%pi"
+>                         else if a == cas_e  then Lisp.Symbol "`$%e"
+>                         else Lisp.Symbol ("`$" ++ s)
 > toLisp (String s)     = Lisp.String s
 > toLisp (Plus a b)     = Lisp.List [Lisp.Symbol "MPLUS", toLisp a, toLisp b]
 > toLisp (Minus a b)    = toLisp $ Plus a (Multiply (Integer (-1)) b)
@@ -174,10 +176,13 @@ Lisp.Value => CASExpr converter
 > toCAS (Lisp.Integer i)        = Integer i
 > toCAS (Lisp.Rational r)       = Rational r
 > toCAS (Lisp.Double d)         = Double d
-> toCAS (Lisp.Symbol s)         = Symbol (case s of
->                                           '`':'$':s -> s
->                                           '$':s     -> s
->                                           otherwise -> s)
+> toCAS (Lisp.Symbol s)         = case s of
+>                                     '`':'$':s -> Symbol s
+>                                     '$':s     -> Symbol s
+>                                     otherwise ->
+>                                         if      s == "$%PI" then cas_pi
+>                                         else if s == "$%E"  then cas_e
+>                                         else Symbol s
 > toCAS (Lisp.String s)         = String s
 > toCAS (Lisp.Quote q)          = toCAS q
 > toCAS (Lisp.List l)           = convert $ map toCAS l

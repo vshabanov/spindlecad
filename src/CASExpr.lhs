@@ -52,6 +52,22 @@ Thoughts:
 >              | Funcall String [CASExpr] -- its better to exclude this at all!
 >                deriving (Eq, Ord, Show)
 
+
+Some mathematical constants expressed as predefined symbols.
+Concrete CAS interface implementation must substitute these symbols
+with CAS-specific ones.
+
+> cas_pi = Symbol "_cas_pi"
+> cas_e  = Symbol "_cas_e"
+
+Math constants symbol => value map.
+Hint: this can be used in 'substitute' function
+to evaluate floating point result.
+
+> constants :: Map.Map String CASExpr
+> constants = Map.fromList [("_cas_pi", Double pi),
+>                           ("_cas_e",  Double $ exp 1)]
+
 TODO: add CASExpr evaluation
 eval :: CASExpr -> CASExpr
 
