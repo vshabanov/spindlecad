@@ -3,7 +3,7 @@
 
 Type level representation of physical dimenstions.
 
-> module TypeLevelPhysicalDimensions where
+> module TypeLevelPhysicalDimension where
 
 The dimension is represented as tuple containing powers of all basic SI units.
 Powers are type level numbers from
@@ -13,6 +13,7 @@ Powers are type level numbers from
 > import TypeLevelBoolean
 
 Definitions of the Seven Basic SI Units:
+(taken from http://www.electro-optical.com/unitconv/unitdict/basic_si.htm)
 
 meter [m]
     The meter is the basic unit of length. It is the distance light travels,

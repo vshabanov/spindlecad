@@ -5,7 +5,7 @@ Type level representation of physical values.
 
 > module TypeLevelPhysicalValue where
 
-> import TypeLevelPhysicalDimensions
+> import TypeLevelPhysicalDimension
 > import TypeLevelInteger -- Zero
 > import TypeLevelBoolean -- BTrue, BFalse
 

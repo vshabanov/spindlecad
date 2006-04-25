@@ -1,10 +1,16 @@
 > {-# OPTIONS -fglasgow-exts #-}
 > {-# OPTIONS -fallow-undecidable-instances #-}
 
-Some physical units
+Some physical units.
+
+Remark: conversion factors are taken
+from http://www.electro-optical.com/unitconv/unitdict/units_cat.htm
+
 
 > module TypeLevelPhysicalUnitsList where
 
+> import TypeLevelInteger
+> import TypeLevelPhysicalDimension
 > import TypeLevelPhysicalValue
 
 Squares
@@ -37,8 +43,22 @@ Time.
 > hour   = 60 .* minute
 > day    = 24 .* hour
 
+Force.
+
+> newton = kilogram *. meter /. second2
+> kgf = 9.80665 .* newton
+
+Pressure.
+
+> type Pascal = Dimension (Neg One) One (Neg (Succ One)) Zero Zero Zero Zero
+> pascal :: Value Pascal
+> pascal = newton /. meter2
+
+Volume.
+
+> liter = 0.001 .* meter3
+> barrel = 158.987294928 .* liter -- just for fun
+
 Unsorted
 
 > rpm = 1 ./ minute
-> newton = kilogram *. meter /. second2
-> pascal = newton /. meter2
