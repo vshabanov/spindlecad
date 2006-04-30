@@ -15,7 +15,9 @@ Lisp values data type
 >            | Symbol String
 >            | String String
 >            | List [Value]
->            | Quote Value deriving (Eq, Ord)
+>            | Quote Value
+>            | AntiQuote Value
+>              deriving (Eq, Ord)
 
 
 Show instance for lisp values
@@ -28,6 +30,7 @@ Show instance for lisp values
 >     show (String s) = show s
 >     show (List l) = "(" ++ unwords (map show l) ++ ")"
 >     show (Quote v) = '`' : show v
+>     show (AntiQuote v) = ',' : show v
 
 
 Parser for lisp values
@@ -85,7 +88,7 @@ Parser for lisp values
 > parseExpr :: Parser Value
 > parseExpr = try parseRational
 >         <|> try parseDouble
->         <|> parseInteger
+>         <|> try parseInteger
 >         <|> parseSymbol
 >         <|> parseString
 >         <|> do char '('
@@ -96,3 +99,6 @@ Parser for lisp values
 >         <|> do char '`'
 >                expr <- parseExpr
 >                return $ Quote expr
+>         <|> do char ','
+>                expr <- parseExpr
+>                return $ AntiQuote expr
