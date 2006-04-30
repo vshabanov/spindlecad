@@ -191,7 +191,9 @@ CASExpr => Lisp.Value converter
 > toLisp :: CASExpr -> Lisp.Value
 > toLisp expr = tl False expr
 >     where tl q (Integer i)    = Lisp.Integer i
->           tl q (Rational r)   = Lisp.Rational r
+>           tl q (Rational r)   = Lisp.List [Lisp.Symbol "(RAT)",
+>                                            Lisp.Integer $ numerator r,
+>                                            Lisp.Integer $ denominator r]
 >           tl q (Double d)     = Lisp.Double d
 >           tl q a@(Symbol s)   = quote q $
 >                                 if      a == cas_pi then Lisp.Symbol "$%pi"

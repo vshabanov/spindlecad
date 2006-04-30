@@ -37,6 +37,16 @@ Cubes
 > mole3     = cube mole     
 > candela3  = cube candela  
 
+Fourths
+
+> meter4    = square meter2
+> kilogram4 = square kilogram2
+> second4   = square second2
+> ampere4   = square ampere2  
+> kelvin4   = square kelvin2
+> mole4     = square mole2
+> candela4  = square candela2
+
 Time.
 
 > minute = 60 .* second
