@@ -23,9 +23,9 @@ from some predefined constants like pi.
 
 The type of exact number itself is a following sum type:
 
-> type EN = Integer Integer
+> data EN = Integer Integer
 >         | Rational Rational
->         | ExactReal CASExpr CR
+>         | ExactReal CASExpr Era.CR
 >         | NegInfinity
 >         | Infinity
 >         | NaN
