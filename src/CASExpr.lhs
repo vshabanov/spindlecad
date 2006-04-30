@@ -25,8 +25,6 @@ Current troubles with CASExpr:
       - many different cases for binary operations (it doesn't add any syntax
         clearness, but odd to handle)
   - No type checking at all
-  - Zero extensibility (funcall is ugly and doesn't grow - it will cause
-    too much errors)
   - Too hard to create expressions
     (maybe from string using parser, but again - no type checking)
 
@@ -49,9 +47,16 @@ Thoughts:
 >              | Expt CASExpr CASExpr
 >              | Equal CASExpr CASExpr
 >              | List [CASExpr]
->              | Funcall String [CASExpr] -- its better to exclude this at all!
+>              | Funcall CASFunction [CASExpr]
 >                deriving (Eq, Ord, Show)
 
+Predefined CAS functions. We use maxima protocol by default.
+All other systems must follow this protocol for compability
+
+> data CASFunction = CFSolve  -- eqlist -> symlist -> varvallist
+>                  | CFDiff   -- expr -> symbol [-> int] -> expr
+>                  | CFSubst  -- varvallist -> expr -> expr
+>                    deriving (Eq, Ord, Show)
 
 Some mathematical constants expressed as predefined symbols.
 Concrete CAS interface implementation must substitute these symbols
@@ -68,8 +73,21 @@ to evaluate floating point result.
 > constants = Map.fromList [("_cas_pi", Double pi),
 >                           ("_cas_e",  Double $ exp 1)]
 
+Some utility
+
+> solve eqlist unknowns =
+>     Funcall CFSolve [List eqlist, List $ map Symbol unknowns]
+
+> diff expr what = Funcall CFDiff [expr, Symbol what]
+> diffn expr what n = Funcall CFDiff [expr, Symbol what, Integer n]
+
+> subst varValPairs expr =
+>     Funcall CFSubst [List (map (\ (var, val) -> Symbol var `Equal` val)
+>                            varValPairs),
+>                      expr]
+
 TODO: add CASExpr evaluation
-eval :: CASExpr -> CASExpr
+eval :: Interpreter -> CASExpr -> CASExpr
 
 CASExpr symbol substitution (with evaluation afterwards)
 

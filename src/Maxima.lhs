@@ -1,13 +1,15 @@
 Interface to Maxima computer algebra system.
 
-> module Maxima where
+> module Maxima (
+>     withInterpreter,
+>     eval
+>   ) where
 
+> import Prelude hiding (catch)
 > import System.IO
 > import System.Process
 > import Control.Monad
-> import Control.Concurrent
-> import Control.Concurrent.MVar
-> import Control.Exception hiding (try, catch)
+> import Control.Exception hiding (try)
 > import Text.ParserCombinators.Parsec
 > import Data.Ratio
 > import Data.IORef
@@ -26,6 +28,21 @@ as reference (which contains unread (unparsed) part of output).
 The work with this IORef done through parseRef function
 which calls specified parser and updates reference so is contains
 unparsed part.
+
+
+With interpreter utility
+
+> withInterpreter :: (Interpreter -> IO a) -> IO a
+> withInterpreter = bracket openInterpreter closeInterpreter
+
+CAS expression evaluation
+
+> eval :: Interpreter -> CASExpr -> IO CASExpr
+> eval i e = do sendCAS i e
+>               r <- receiveCAS i
+>               return r
+
+For simple test case you can look at the bottom of the file.
 
 
 Interpreter I/O.
@@ -54,6 +71,8 @@ closeInterpreter quits maxima
 
 > closeInterpreter :: Interpreter -> IO ()
 > closeInterpreter (inp, _, _, pid) = do
+>     hPutStrLn inp "to_lisp ();" -- after some errors interpreter
+>                                 -- can go back to maxima mode
 >     hPutStrLn inp "($quit)"
 >     waitForProcess pid
 >     return ()
@@ -69,10 +88,18 @@ Return string between last answer and MAXIMA> prompt,
 i.e. maxima output between two "MAXIMA>" lines.
 
 > receiveAnswer :: Interpreter -> IO String
-> receiveAnswer i = parseOutput (answer "") "maxima output" i
->     where answer acc =
+> receiveAnswer i = do
+>     r <- parseOutput (answer "") "maxima output" i
+>     case r of
+>         Left e -> error ("Incorrect maxima answer:" ++ e)
+>         Right a -> return a
+>   where answer acc =
 >               try (do string "MAXIMA>" <?> "Maxima prompt (\"MAXIMA>\")"
->                       return $ reverse acc)
+>                       return $ Right $ reverse acc)
+>               <|> try (do string "(%i"
+>                           many1 digit
+>                           string ")"
+>                           return $ Left $ reverse acc)
 >               <|> (do c <- anyChar
 >                       answer (c:acc))
 
@@ -87,19 +114,29 @@ Since there can be non-lisp strings in answer
 until lisp value found. After this we continue parsing and return
 only last lisp value (since log massages can contain digits and
 other stuff that can be misinterpreted as lisp value).
-When no lisp value found Nothing returned.
+When no lisp value found error raised.
 
-> receiveLisp :: Interpreter -> IO (Maybe Lisp.Value)
+> receiveLisp :: Interpreter -> IO Lisp.Value
 > receiveLisp i = do
 >     answer <- receiveAnswer i
+>     return $ parseLispAnswer answer
+
+> parseLispAnswer :: String -> Lisp.Value
+> parseLispAnswer answer =
 >     case parse (lispAnswer Nothing) "maxima lisp output" answer of
 >         Left err -> error ("Can't parse maxima lisp answer: "
 >                            ++ show err)
->         Right r  -> return r
->   where lispAnswer r = try (do e <- Lisp.parseExpr
->                                lispAnswer (Just e))
+>         Right (Left e)  -> error ("Lisp error found: " ++ e)
+>         Right (Right Nothing)  -> error ("No lisp found in maxima answer:"
+>                                          ++ answer)
+>         Right (Right (Just r)) -> r
+>   where lispAnswer r = 
+>                        try (do string "Lisp error"
+>                                return (Left answer))
+>                        <|> try (do e <- Lisp.parseExpr
+>                                    lispAnswer (Just e))
 >                        <|> (anyChar >> lispAnswer r)
->                        <|> return r
+>                        <|> return (Right r)
 
 CAS command sender.
 
@@ -108,12 +145,10 @@ CAS command sender.
 
 CAS expression receiver.
 
-> receiveCAS :: Interpreter -> IO (Maybe CASExpr)
+> receiveCAS :: Interpreter -> IO CASExpr
 > receiveCAS i = do
 >     l <- receiveLisp i
->     case l of
->         Nothing -> return Nothing
->         Just l  -> return $ Just (toCAS l)
+>     return $ toCAS l
 
 Auxiliary functons for interpreter I/O.
 
@@ -154,21 +189,35 @@ in parseRef to wait until there is any char after
 CASExpr => Lisp.Value converter
 
 > toLisp :: CASExpr -> Lisp.Value
-> toLisp (Integer i)    = Lisp.Integer i
-> toLisp (Rational r)   = Lisp.Rational r
-> toLisp (Double d)     = Lisp.Double d
-> toLisp a@(Symbol s)   = if      a == cas_pi then Lisp.Symbol "`$%pi"
->                         else if a == cas_e  then Lisp.Symbol "`$%e"
->                         else Lisp.Symbol ("`$" ++ s)
-> toLisp (String s)     = Lisp.String s
-> toLisp (Plus a b)     = Lisp.List [Lisp.Symbol "MPLUS", toLisp a, toLisp b]
-> toLisp (Minus a b)    = toLisp $ Plus a (Multiply (Integer (-1)) b)
-> toLisp (Multiply a b) = Lisp.List [Lisp.Symbol "MTIMES", toLisp a, toLisp b]
-> toLisp (Divide a b)   = toLisp $ Multiply a (Expt b (Integer (-1)))
-> toLisp (Expt a b)     = Lisp.List [Lisp.Symbol "MEXPT", toLisp a, toLisp b]
-> toLisp (Equal a b)    = Lisp.List [Lisp.Symbol "MEQUAL", toLisp a, toLisp b]
-> toLisp (List l)       = Lisp.List $ Lisp.Symbol "(MEQUAL)" : map toLisp l
-> toLisp (Funcall f l)  = Lisp.List $ Lisp.Symbol ('$':f) : map toLisp l
+> toLisp expr = tl False expr
+>     where tl q (Integer i)    = Lisp.Integer i
+>           tl q (Rational r)   = Lisp.Rational r
+>           tl q (Double d)     = Lisp.Double d
+>           tl q a@(Symbol s)   = quote q $
+>                                 if      a == cas_pi then Lisp.Symbol "$%pi"
+>                                 else if a == cas_e  then Lisp.Symbol "$%e"
+>                                 else Lisp.Symbol ("$" ++ s)
+>           tl q (String s)     = Lisp.String s
+>           tl q (Plus a b)     = quoted q "(MPLUS)" a b
+>           tl q (Minus a b)    = tl q $ Plus a (Multiply (Integer (-1)) b)
+>           tl q (Multiply a b) = quoted q "(MTIMES)" a b
+>           tl q (Divide a b)   = tl q $ Multiply a (Expt b (Integer (-1)))
+>           tl q (Expt a b)     = quoted q "(MEXPT)" a b
+>           tl q (Equal a b)    = quoted q "(MEQUAL)" a b
+>           tl q (List l)       = quote q $ Lisp.List $
+>                                 Lisp.Symbol "(MLIST)" : map (tl True) l
+>           tl q (Funcall f l)  = antiquote q $ Lisp.List $
+>                                 Lisp.Symbol fname : map (tl False) l
+>               where fname = case f of
+>                                 CFSolve -> "$solve"
+>                                 CFDiff  -> "$diff"
+>                                 CFSubst -> "$sublis"
+>                                 --otherwise ->
+>                                 --      error (show f ++ " is not supported")
+>           antiquote q r = if q then Lisp.AntiQuote r else r
+>           quote q r = if q then r else Lisp.Quote r
+>           quoted q s a b = quote q $
+>                            Lisp.List [Lisp.Symbol s, tl True a, tl True b]
 
 Lisp.Value => CASExpr converter
 
@@ -176,15 +225,14 @@ Lisp.Value => CASExpr converter
 > toCAS (Lisp.Integer i)        = Integer i
 > toCAS (Lisp.Rational r)       = Rational r
 > toCAS (Lisp.Double d)         = Double d
-> toCAS (Lisp.Symbol s)         = case s of
->                                     '`':'$':s -> Symbol s
->                                     '$':s     -> Symbol s
->                                     otherwise ->
->                                         if      s == "$%PI" then cas_pi
->                                         else if s == "$%E"  then cas_e
->                                         else Symbol s
+> toCAS (Lisp.Symbol s)         = if      s == "$%PI" then cas_pi
+>                                 else if s == "$%E"  then cas_e
+>                                 else case s of
+>                                     '$':xs    -> Symbol xs
+>                                     otherwise -> Symbol s
 > toCAS (Lisp.String s)         = String s
 > toCAS (Lisp.Quote q)          = toCAS q
+> toCAS (Lisp.AntiQuote q)      = toCAS q
 > toCAS (Lisp.List l)           = convert $ map toCAS l
 >     where convert (List [Symbol "MLIST"]:xs) = List xs
 >           convert (List (Symbol "MPLUS":_):xs) = foldBinOp Plus xs
@@ -207,16 +255,19 @@ Lisp.Value => CASExpr converter
 >           compact (Multiply a (Expt b (Integer (-1)))) = Divide a b
 >           compact a = a
 
-> testCase = do
->     i <- openInterpreter
->     sendCommand i "($solve #$(a*x^2+2*b*x+c=0)$ #$(x)$)"
->     a <- receiveCAS i
->     case a of
->         Just a -> print $ substitute (Map.fromList [("A", Integer 4),
->                                                     ("B", Integer 2),
->                                                     ("C", Integer 1)]) a
->         Nothing -> return ()
->     closeInterpreter i
+
+Simple test case
+
+> testCase = withInterpreter $ \i -> do
+>     a <- eval i (subst [("x", Integer 111)] $
+>                  solve [diffn (Expt (Symbol "x") (Integer 3)) "x" 1
+>                         `Equal` Integer (-12),
+>                         (Symbol "x" `Plus` Symbol "y") `Equal` Integer 10
+>                        ]
+>                  ["x", "y"])
+>     print $ substitute (Map.fromList [("A", Integer 4),
+>                                       ("B", Integer 2),
+>                                       ("C", Integer 1)]) a
 
 -------------------------------------------------------------------------------
 
