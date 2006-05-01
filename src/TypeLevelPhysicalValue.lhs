@@ -8,6 +8,7 @@ Type level representation of physical values.
 > import TypeLevelPhysicalDimension
 > import TypeLevelInteger -- Zero
 > import TypeLevelBoolean -- BTrue, BFalse
+> import CASExpr
 
 
 The phantom type for physical values. It only contain numerical value
@@ -23,7 +24,7 @@ all values are made of Double type.
 This is subject to change (all values as Rational). Think
 about it after CAS interface & constraint solver are done.
 
-> data Value d = Value Double deriving (Eq, Ord, Show)
+> data Value d = Value CASExpr deriving (Eq, Ord, Show)
 
 
 Basic units
@@ -39,7 +40,7 @@ Basic units
 
 Unit power prefixes
 
-> power n = ((10 ^^ n) .*)
+> power n = ((10 ^^ n :: CASExpr) .*)
 
 > yotta = power $  24  -- Y
 > zetta = power $  21  -- Z
@@ -114,12 +115,12 @@ Here they are:
 
 > infixl 8  .*, ./
 
-> (.*) :: (Real a) => a -> Value d -> Value d
-> a .* Value b = Value (realToFrac a * b)
+> (.*) :: CASExpr -> Value d -> Value d
+> a .* Value b = Value (a * b)
 
-> (./) :: (Real a, DimensionDivide NonDim d2 d)
->         => a -> Value d2 -> Value d
-> a ./ Value b = Value (realToFrac a / b)
+> (./) :: (DimensionDivide NonDim d2 d)
+>         => CASExpr -> Value d2 -> Value d
+> a ./ Value b = Value (a / b)
 
 
 Value simplification. It converts nondimensional argument to Double and
@@ -136,7 +137,7 @@ return dimensional argument unchanged.
 >     valueSimplify (Value a) =
 >          valueSimplify' (Value a :: Value d) (nondimensional (typeValue :: d))
 
-> instance ValueSimplify' (Value d) BTrue Double where
+> instance ValueSimplify' (Value d) BTrue CASExpr where
 >     valueSimplify' (Value a) BTrue = a
 > instance ValueSimplify' (Value d) BFalse (Value d) where
 >     valueSimplify' (Value a) BFalse = (Value a)

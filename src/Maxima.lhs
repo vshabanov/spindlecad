@@ -15,7 +15,7 @@ Interface to Maxima computer algebra system.
 > import Data.IORef
 > import qualified Data.Map as Map
 > import qualified Lisp
-> import CASExpr
+> import CASExpr hiding (eval)
 
 Type of Maxima command line interpreter.
 
@@ -188,13 +188,29 @@ in parseRef to wait until there is any char after
 
 CASExpr => Lisp.Value converter
 
+TODO: Find a way how to send in lisp (+ 1 x) so we get ((MPLUS) 1 $X)
+in answer, not "x is not an integer". After this remove all quoted/antiquoted
+stuff. Maxima itself can do stuff like ($diff ($diff ($sin `$x) `$x) `$x).
+We don't need ($diff `((%SIN) $x) `$x) - is wouldn't work with two diffs,
+i.e. ($diff `((%DERIVATIVE) ((%SIN) $x) $x)) `$x)
+doesn't give ((MTIMES SIMP) -1 ((%SIN SIMP) $X)) -- "-sin(x)"
+it gives awful ((MTIMES SIMP) ((%DERIVATIVE SIMP) ((%SIN) $X) 1 NIL $X $X)
+                 ((%DEL SIMP) $X))
+
+TODO2: Add support for other CASFunction constructors (CSSin, CSATanh, ...).
+Add this in `toLisp` and in `toCAS` also (remark that in expressions they
+will be ((%SIN SIMP) ...), ((%COS SIMP) ...), and so on).
+Add support for SEC, COSEC (they are returned for diff(tan(x))).
+(or maybe add userfun to CASFunction ???
+but it will then work with Maxima.eval and will not with CASExpr.eval -
+that's too dangerous!!!)
+
 > toLisp :: CASExpr -> Lisp.Value
 > toLisp expr = tl False expr
 >     where tl q (Integer i)    = Lisp.Integer i
 >           tl q (Rational r)   = Lisp.List [Lisp.Symbol "(RAT)",
 >                                            Lisp.Integer $ numerator r,
 >                                            Lisp.Integer $ denominator r]
->           tl q (Double d)     = Lisp.Double d
 >           tl q a@(Symbol s)   = quote q $
 >                                 if      a == cas_pi then Lisp.Symbol "$%pi"
 >                                 else if a == cas_e  then Lisp.Symbol "$%e"
@@ -214,6 +230,8 @@ CASExpr => Lisp.Value converter
 >                                 CFSolve -> "$solve"
 >                                 CFDiff  -> "$diff"
 >                                 CFSubst -> "$sublis"
+>                                 CFAbs   -> "$abs"
+>                                 CFSignum -> "$signum"
 >                                 --otherwise ->
 >                                 --      error (show f ++ " is not supported")
 >           antiquote q r = if q then Lisp.AntiQuote r else r
@@ -226,7 +244,8 @@ Lisp.Value => CASExpr converter
 > toCAS :: Lisp.Value -> CASExpr
 > toCAS (Lisp.Integer i)        = Integer i
 > toCAS (Lisp.Rational r)       = Rational r
-> toCAS (Lisp.Double d)         = Double d
+> toCAS (Lisp.Double d)         = -- Rational $ toRational d
+>     error "Double values from maxima are forbidden for precision reasons"
 > toCAS (Lisp.Symbol s)         = if      s == "$%PI" then cas_pi
 >                                 else if s == "$%E"  then cas_e
 >                                 else case s of

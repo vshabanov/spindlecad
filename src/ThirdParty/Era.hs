@@ -155,15 +155,15 @@ log2 = div2n (log_drx (recip (fromInteger 2))) 1
 sqrt1By2 :: CR
 sqrt1By2 = sqrt (recip (fromInteger 2))
 
-instance Enum CR where
-  enumFrom         = iterate (+ fromInteger 1)
-  enumFromThen n m = iterate (+(m-n)) n
+--instance Enum CR where
+--  enumFrom         = iterate (+ fromInteger 1)
+--  enumFromThen n m = iterate (+(m-n)) n
   
-instance Real CR
+--instance Real CR
  -- where toRational x@(CR_ x') = x' n % 2^n where n = digitsToBits digits
-instance RealFrac CR where
-  properFraction x@(CR_ x') = (fromInteger n, x - fromInteger n) where n = x' 0
-instance RealFloat CR
+--instance RealFrac CR where
+--  properFraction x@(CR_ x') = (fromInteger n, x - fromInteger n) where n = x' 0
+--instance RealFloat CR
 
 -- printing and reading the reals:
 
@@ -183,8 +183,8 @@ digitsToBits d = ceiling (fromIntegral d * (logBase 2.0 10.0)) + 4
 digits :: Int
 digits = 40
 
-instance Read CR where
-  readsPrec p = readSigned readFloat
+--instance Read CR where
+--  readsPrec p = readSigned readFloat
 
 instance Show CR where
   showsPrec p x = let xs = get_str digits x in
@@ -207,7 +207,7 @@ round_uk x = floor (x+1%2)
 
 -- type ReadS a = String -> [(a, String)]
 
-readFloat :: (RealFloat a) => ReadS a
+readFloat :: (Fractional a) => ReadS a
 readFloat r = [(fromRational ((n%1)*10^^(k-d)),t) | (n,d,s) <- readFix r,
                                                     (k,t) <- readExp s]
               where readFix r = [(read (ds++ds'), length ds', t)
