@@ -26,6 +26,7 @@ about it after CAS interface & constraint solver are done.
 
 > data Value d = Value CASExpr deriving (Eq, Ord, Show)
 
+> type NondimensionalValue = CASExpr
 
 Basic units
 
@@ -103,6 +104,8 @@ Operators precedence
 > infixl 7  *., /.
 > infixl 6  +., -.
 
+TODO: now we have fixed number type associated with dimension value,
+so we can change *. and /. operators to accept both values and numbers.
 
 Since any haskell digit by default has type (Num a) => a we can't
 provide *. or /. operators which will work with digits and values

@@ -55,6 +55,8 @@ Time.
 
 Force.
 
+> type Newton = Dimension One One (Neg (Succ One)) Zero Zero Zero Zero
+> newton, kgf :: Value Newton
 > newton = kilogram *. meter /. second2
 > kgf = 9.80665 .* newton
 
@@ -69,6 +71,24 @@ Volume.
 > liter = 0.001 .* meter3
 > barrel = 158.987294928 .* liter -- just for fun
 
+Rigidity
+
+> type NewtonDivMeter = Dimension Zero One (Neg (Succ One)) Zero Zero Zero Zero
+
+Rotational speed, frequency
+
+> type Hertz = Dimension Zero Zero (Neg One) Zero Zero Zero Zero
+> hertz, rpm :: Value Hertz
+> hertz = 1 ./ second
+> rpm = 1 ./ minute
+
+Angle
+
+> radian, degree :: NondimensionalValue
+> radian = 1
+> degree = pi / 360
+
 Unsorted
 
-> rpm = 1 ./ minute
+> mm = milli meter
+> kN = kilo newton
