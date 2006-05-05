@@ -29,7 +29,7 @@ Bearing description data type
 Bearing data type.
 
 > data Bearing =
->     AxialBearing
+>     AngularContactBearing
 >     { manufacturer :: String,
 >       name :: String,
 >       contactAngle :: NondimensionalValue,

@@ -34,7 +34,7 @@ List of all bearings defined below
 
 FAG hi-precision spindle bearings
 
-> fagB7012C_2RSD_T_P4S_UL = AxialBearing -- page 40-41
+> fagB7012C_2RSD_T_P4S_UL = AngularContactBearing -- page 40-41
 >     { manufacturer = "FAG",
 >       name = "B7012C.2RSD.T.P4S.UL", -- sealed design, ISO P4, light series
 >       -- code = "B7012C.T.P4S"
@@ -51,7 +51,7 @@ FAG hi-precision spindle bearings
 >       axialRigidity = 64.5 .* newton /. micro meter
 >     }
 
-> fagB7015C_2RSD_T_P4S_UL = AxialBearing -- page 46-47
+> fagB7015C_2RSD_T_P4S_UL = AngularContactBearing -- page 46-47
 >     { manufacturer = "FAG",
 >       name = "B7015C.2RSD.T.P4S.UL", -- sealed design, ISO P4, light series
 >       -- code = "B7015C.T.P4S"
