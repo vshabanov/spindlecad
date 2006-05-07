@@ -30,6 +30,8 @@ system of equations that describes particular spindle.
 > import qualified CASExpr (eval)
 > import Material
 > import MaterialsList
+> import Bearing
+> import BearingsList
 > import Maxima
 > import TypeLevelPhysicalDimension
 > import TypeLevelPhysicalValue
@@ -115,11 +117,54 @@ Radial bearing
 >      `Equal` subst [(x, pv coordinate meter)] rhs]
 >     where x = prefix desc ++ "x"
 
-Test case
 
-> testCase = withInterpreter $ \i -> do
->     let mm = milli meter
->         d = 100 .* mm
+Moment inertia of circle
+    pi/64*d^4
+
+> jCircle d = pi/64 * pv d meter**4
+
+Areas.
+
+> areaOfCircle d = pi/4 * pv d meter**2
+
+
+Utility type class which convert physical values to CAS values
+and don't change values if they are already CASExpr.
+
+> pv v t = physicalValueToCASExpr v t
+
+> class PhysicalValueToCASExpr v t where
+>     physicalValueToCASExpr :: v -> t -> CASExpr
+
+> instance PhysicalValueToCASExpr CASExpr (Value a) where
+>     physicalValueToCASExpr a _ = a
+> instance (DimensionDivide a a NonDim) =>
+>     PhysicalValueToCASExpr (Value a) (Value a) where
+>     physicalValueToCASExpr a d = a /. d
+
+
+--------------------------------------------------------------------------------
+
+Test case #1.
+Spindle with 1N force on the end of console part
+and two radial GOST 46120 bearings.
+
+Scheme:
+    | 1N
+    |    _       _
+    V    o       o
+    ----------------
+         o       o
+         -       -
+
+Parameters:
+    Shaft diameter              100 mm
+    Console length              100 mm
+    Bay lengh                   800 mm
+    Bearing radial rigidity     120 N/mum
+
+> testCase1 = withInterpreter $ \i -> do
+>     let d = 100 .* mm
 >         sj = jCircle d
 >         e = modulusOfElasticity steel
 >         desc = ("", e, sj)
@@ -149,22 +194,65 @@ Test case
 >                      print $ y * CASExpr.eval (meter /. micro meter))
 >               (map (* (mm /. meter)) [0,10..100])
 
-Moment inertia of circle
-    pi/64*d^4
 
-> jCircle d = pi/64 * pv d meter**4
+Test case #2.
+Spindle with 1N force in the middle of bay part
+and two axial FAG B7015C.T.P4S bearings.
+
+Scheme:
+            | 1N
+            |
+       o\   V    /o
+    ----------------
+       o/        \o
+
+Parameters:
+    Shaft diameter              75 mm
+    Console length              100 mm
+    Bay lengh                   800 mm
+    Bearings axial rigidity     76.8 N/mum
+
+> testCase2 = withInterpreter $ \i -> do
+>     let bearing = fagB7015C_2RSD_T_P4S_UL
+>         d = innerDiameter bearing
+>         sj = jCircle d
+>         s = areaOfCircle d
+>         e = modulusOfElasticity steel
+>         desc = ("", e, sj)
+>         c = 500 .* mm
+>         b = 100 .* mm
+>         a = 800 .* mm
+>         ja = axialRigidity bearing
+>         j = 6 .* ja -- radial regidity calculated using FAG recommendations
+>         y = generalSolution desc
+>         y1  = y   + partialSolutionRadialForce desc (Symbol "R1") b
+>         y1f = y1  + partialSolutionRadialForce desc (1.*newton) c
+>         y2  = y1f + partialSolutionRadialForce desc (Symbol "R2") (a+.b)
+>     -- to check ourselfes we first solve this spindle
+>     -- as one with two radial bearings
+>     let eqlistAsRadial = (freeEnd desc (0.*mm) y ++
+>                           freeEnd desc (a+.b) y2 ++
+>                           radialBearing desc b (Symbol "R1") j y1 ++
+>                           radialBearing desc (a+.b) (Symbol "R2") j y2)
+>     asRadial <- eval i $ solve eqlistAsRadial ["A0", "A1", "A2", "A3",
+>                                                "R1", "R2"]
+>     printValues i asRadial y   "X" [0,10..100]
+>     printValues i asRadial y1  "X" [100,200..500]
+>     printValues i asRadial y1f "X" [500,600..900]
+>     printValues i asRadial y2  "X" [900,1000]
 
 
-Utility type class which convert physical values to CAS values
-and don't change values if they are already CASExpr.
+printValues prints `function` results (in mum) for `parameter`
+in `list` of values (in mm). `solution` is used to substitute all
+other parameters
 
-> pv v t = physicalValueToCASExpr v t
-
-> class PhysicalValueToCASExpr v t where
->     physicalValueToCASExpr :: v -> t -> CASExpr
-
-> instance PhysicalValueToCASExpr CASExpr (Value a) where
->     physicalValueToCASExpr a _ = a
-> instance (DimensionDivide a a NonDim) =>
->     PhysicalValueToCASExpr (Value a) (Value a) where
->     physicalValueToCASExpr a d = a /. d
+> printValues i solution function parameter list = do
+>     let List [a] = solution
+>     f <- eval i $ Funcall CFSubst [a, function]
+>     mapM_ (\ i -> do let y = (CASExpr.eval $ substitute
+>                               (Map.fromList [(parameter, i)]) $
+>                               f * (meter /. micro meter)) :: Era.CR
+>                      putStrLn (show (truncate $ CASExpr.eval $
+>                                      i .* meter /. mm)
+>                                ++ "\t" ++ show y))
+>               (map (* (mm /. meter)) list)
