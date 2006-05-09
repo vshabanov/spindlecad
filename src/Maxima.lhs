@@ -22,7 +22,8 @@ Interface to Maxima computer algebra system.
 
 > module Maxima (
 >     withInterpreter,
->     eval
+>     eval,
+>     debugEval -- same as eval but prints Maxima I/O
 >   ) where
 
 > import Prelude hiding (catch)
@@ -32,6 +33,7 @@ Interface to Maxima computer algebra system.
 > import Control.Exception hiding (try)
 > import Text.ParserCombinators.Parsec
 > import Data.Ratio
+> import Data.Char
 > import Data.IORef
 > import qualified Data.Map as Map
 > import qualified Lisp
@@ -61,6 +63,16 @@ CAS expression evaluation
 > eval i e = do sendCAS i e
 >               r <- receiveCAS i
 >               return r
+
+> debugEval :: Interpreter -> CASExpr -> IO CASExpr
+> debugEval i e = do putStrLn "--------- To Maxima ---------"
+>                    print $ toLisp e
+>                    sendCAS i e
+>                    a <- receiveAnswer i
+>                    putStrLn "-------- From Maxima --------"
+>                    putStrLn a
+>                    putStrLn "-----------------------------"
+>                    return $ toCAS $ parseLispAnswer a
 
 For simple test case you can look at the bottom of the file.
 
@@ -208,56 +220,32 @@ in parseRef to wait until there is any char after
 
 CASExpr => Lisp.Value converter
 
-TODO: Find a way how to send in lisp (+ 1 x) so we get ((MPLUS) 1 $X)
-in answer, not "x is not an integer". After this remove all quoted/antiquoted
-stuff. Maxima itself can do stuff like ($diff ($diff ($sin `$x) `$x) `$x).
-We don't need ($diff `((%SIN) $x) `$x) - is wouldn't work with two diffs,
-i.e. ($diff `((%DERIVATIVE) ((%SIN) $x) $x)) `$x)
-doesn't give ((MTIMES SIMP) -1 ((%SIN SIMP) $X)) -- "-sin(x)"
-it gives awful ((MTIMES SIMP) ((%DERIVATIVE SIMP) ((%SIN) $X) 1 NIL $X $X)
-                 ((%DEL SIMP) $X))
-
-TODO2: Add support for other CASFunction constructors (CSSin, CSATanh, ...).
-Add this in `toLisp` and in `toCAS` also (remark that in expressions they
-will be ((%SIN SIMP) ...), ((%COS SIMP) ...), and so on).
+TODO: 
 Add support for SEC, COSEC (they are returned for diff(tan(x))).
 (or maybe add userfun to CASFunction ???
 but it will then work with Maxima.eval and will not with CASExpr.eval -
 that's too dangerous!!!)
 
 > toLisp :: CASExpr -> Lisp.Value
-> toLisp expr = tl False expr
->     where tl q (Integer i)    = Lisp.Integer i
->           tl q (Rational r)   = Lisp.List [Lisp.Symbol "(RAT)",
->                                            Lisp.Integer $ numerator r,
->                                            Lisp.Integer $ denominator r]
->           tl q a@(Symbol s)   = quote q $
->                                 if      a == cas_pi then Lisp.Symbol "$%pi"
->                                 else if a == cas_e  then Lisp.Symbol "$%e"
->                                 else Lisp.Symbol ("$" ++ s)
->           tl q (String s)     = Lisp.String s
->           tl q (Plus a b)     = quoted q "(MPLUS)" a b
->           tl q (Minus a b)    = tl q $ Plus a (Multiply (Integer (-1)) b)
->           tl q (Multiply a b) = quoted q "(MTIMES)" a b
->           tl q (Divide a b)   = tl q $ Multiply a (Expt b (Integer (-1)))
->           tl q (Expt a b)     = quoted q "(MEXPT)" a b
->           tl q (Equal a b)    = quoted q "(MEQUAL)" a b
->           tl q (List l)       = quote q $ Lisp.List $
->                                 Lisp.Symbol "(MLIST)" : map (tl True) l
->           tl q (Funcall f l)  = antiquote q $ Lisp.List $
->                                 Lisp.Symbol fname : map (tl False) l
->               where fname = case f of
->                                 CFSolve -> "$solve"
->                                 CFDiff  -> "$diff"
->                                 CFSubst -> "$sublis"
->                                 CFAbs   -> "$abs"
->                                 CFSignum -> "$signum"
->                                 --otherwise ->
->                                 --      error (show f ++ " is not supported")
->           antiquote q r = if q then Lisp.AntiQuote r else r
->           quote q r = if q then r else Lisp.Quote r
->           quoted q s a b = quote q $
->                            Lisp.List [Lisp.Symbol s, tl True a, tl True b]
+> toLisp (Integer i)    = Lisp.Integer i
+> toLisp (Rational r)   = toLisp (Integer (numerator r)
+>                                 `Divide` Integer (denominator r))
+> toLisp a@(Symbol s)   = Lisp.Quote $
+>                         if      a == cas_pi then Lisp.Symbol "$%PI"
+>                         else if a == cas_e  then Lisp.Symbol "$%E"
+>                         else Lisp.Symbol $ symbolToMaxima s
+> toLisp (String s)     = Lisp.String s
+> toLisp (Plus a b)     = mfuncall "mplus" a b
+> toLisp (Minus a b)    = toLisp $ Plus a (Multiply (Integer (-1)) b)
+> toLisp (Multiply a b) = mfuncall "mtimes" a b
+> toLisp (Divide a b)   = toLisp $ Multiply a (Expt b (Integer (-1)))
+> toLisp (Expt a b)     = mfuncall "mexpt" a b
+> toLisp (Equal a b)    = mfuncall "mequal" a b
+> toLisp (List l)       = mfuncallList "mlist" l
+> toLisp (Funcall f l)  =
+>     mfuncallList (Map.findWithDefault
+>                     (error ("Maxima function not found for: " ++ show f))
+>                     f (Map.fromList maximaFunctions)) l
 
 Lisp.Value => CASExpr converter
 
@@ -268,9 +256,7 @@ Lisp.Value => CASExpr converter
 >     error "Double values from maxima are forbidden for precision reasons"
 > toCAS (Lisp.Symbol s)         = if      s == "$%PI" then cas_pi
 >                                 else if s == "$%E"  then cas_e
->                                 else case s of
->                                     '$':xs    -> Symbol xs
->                                     otherwise -> Symbol s
+>                                 else Symbol (symbolFromMaxima s)
 > toCAS (Lisp.String s)         = String s
 > toCAS (Lisp.Quote q)          = toCAS q
 > toCAS (Lisp.AntiQuote q)      = toCAS q
@@ -282,6 +268,10 @@ Lisp.Value => CASExpr converter
 >           convert (List (Symbol "MEQUAL":_):xs) = foldBinOp Equal xs
 >           convert (List (Symbol "RAT":_):Integer a:Integer b:[]) =
 >               Rational (a%b)
+>           convert (List (Symbol f:_):xs) =
+>               Funcall (Map.findWithDefault
+>                          (error ("CAS function not found for: " ++ f))
+>                          f (Map.fromList casFunctions)) xs
 >           convert a = List a
 >           foldBinOp f [] = error "foldBinOp called on empty list"
 >           foldBinOp f [x] = x
@@ -295,6 +285,75 @@ Lisp.Value => CASExpr converter
 >           compact (Multiply (Expt a (Integer (-1))) b) = Divide b a
 >           compact (Multiply a (Expt b (Integer (-1)))) = Divide a b
 >           compact a = a
+
+
+Some utility functions used by toLisp/toCAS.
+
+CASFunction <=> Maxima symbol association lists.
+Remark about '$' and '%' prefixes:
+ - (mfuncall `$function params) returns numerical result for all floating
+   point functions and normal restult for solve, diff, etc
+ - (mfuncall `%function params) returns symbolic result for all floating
+   point functions and also symbolic restult for solve, diff, etc
+   i.e. it not performs diff, but instead returns ((%DIFF SIMP)...)
+
+> maximaFunctions :: [(CASFunction, String)]
+> maximaFunctions = [(CFSolve   , "$solve"),
+>                    (CFDiff    , "$diff"),
+>                    (CFSubst   , "$sublis"),
+>                    (CFAbs     , "mabs"),
+>                    (CFSignum  , "%signum"),
+>                    (CFExp     , "%exp"),
+>                    (CFLog     , "%log"),
+>                    (CFSqrt    , "%sqrt"),
+>                    (CFSin     , "%sin"),
+>                    (CFCos     , "%cos"),
+>                    (CFTan     , "%tan"),
+>                    (CFASin    , "%asin"),
+>                    (CFACos    , "%acos"),
+>                    (CFATan    , "%atan"),
+>                    (CFSinh    , "%sinh"),
+>                    (CFCosh    , "%cosh"),
+>                    (CFTanh    , "%tanh"),
+>                    (CFASinh   , "%asinh"),
+>                    (CFACosh   , "%acosh"),
+>                    (CFATanh   , "%atanh")]
+
+> casFunctions :: [(String, CASFunction)]
+> casFunctions = map (\(a,b) -> (map toUpper b,a))
+>                (maximaFunctions
+>                 ++
+>                 [(CFSolve, "%solve"),
+>                  (CFDiff,  "%diff"),
+>                  (CFSubst, "%sublis")])
+
+Utility for using (mfuncall `function ...)
+
+> mfuncall :: String -> CASExpr -> CASExpr -> Lisp.Value
+> mfuncall s a b = Lisp.List [Lisp.Symbol "mfuncall",
+>                             Lisp.Quote $ Lisp.Symbol s,
+>                             toLisp a, toLisp b]
+
+> mfuncallList :: String -> [CASExpr] -> Lisp.Value
+> mfuncallList s l = Lisp.List ([Lisp.Symbol "mfuncall",
+>                                Lisp.Quote $ Lisp.Symbol s] ++ map toLisp l)
+
+Symbol <=> Maxima symbol conversion routines.
+
+> symbolToMaxima :: String -> String
+> symbolToMaxima s =
+>     if      map toLower s == s then '$' : map toUpper s
+>     else if map toUpper s == s then "|$" ++ map toLower s ++ "|"
+>     else "|$" ++ s ++ "|"
+
+> symbolFromMaxima :: String -> String
+> symbolFromMaxima ('$':xs) = map toLower xs
+> symbolFromMaxima ('|':'$':xs) =
+>     if      map toLower s == s then map toUpper s
+>     else if map toUpper s == s then map toLower s
+>     else s
+>   where s = takeWhile (/= '|') xs
+> symbolFromMaxima a = a
 
 
 Simple test case

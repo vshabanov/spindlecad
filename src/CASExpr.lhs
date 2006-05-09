@@ -140,9 +140,9 @@ Remark that Double is a default.
 >         CFSin -> sin
 >         CFCos -> cos
 >         CFTan -> tan
->         CFASin -> sin
->         CFACos -> cos
->         CFATan -> tan
+>         CFASin -> asin
+>         CFACos -> acos
+>         CFATan -> atan
 >         CFSinh -> sinh
 >         CFCosh -> cosh
 >         CFTanh -> tanh

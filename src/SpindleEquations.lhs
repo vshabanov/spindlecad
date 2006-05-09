@@ -189,13 +189,14 @@ Parameters:
 >     y0 <- eval i $ Funcall CFSubst [a, sf]
 >     --print y0
 >     mapM_ (\ i -> do let y = (CASExpr.eval $
->                               substitute (Map.fromList [("X", i)]) y0)::Era.CR
+>                               substitute (Map.fromList [("x", i)]) y0)
+>                              ::Era.CR
 >                      --printf "%.5f\n" $ y * (meter /. micro meter)))
 >                      print $ y * CASExpr.eval (meter /. micro meter))
 >               (map (* (mm /. meter)) [0,10..100])
 
 
-Test case #2.
+Test case #2. FAILED. Incorrect equations used. Don't see below.
 Spindle with 1N force in the middle of bay part
 and two axial FAG B7015C.T.P4S bearings.
 
@@ -215,6 +216,7 @@ Parameters:
 > testCase2 = withInterpreter $ \i -> do
 >     let bearing = fagB7015C_2RSD_T_P4S_UL
 >         d = innerDiameter bearing
+>         ca = contactAngle bearing
 >         sj = jCircle d
 >         s = areaOfCircle d
 >         e = modulusOfElasticity steel
@@ -236,19 +238,94 @@ Parameters:
 >                           radialBearing desc (a+.b) (Symbol "R2") j y2)
 >     asRadial <- eval i $ solve eqlistAsRadial ["A0", "A1", "A2", "A3",
 >                                                "R1", "R2"]
->     printValues i asRadial y   "X" [0,10..100]
->     printValues i asRadial y1  "X" [100,200..500]
->     printValues i asRadial y1f "X" [500,600..900]
->     printValues i asRadial y2  "X" [900,1000]
+>     printSolvedExpr i     "y_0  = " asRadial [("x",0)] y
+>     y' <- eval i $ diff y "x"
+>     printSolvedExpr i     "y'_0 = " asRadial [("x",0)] y'
+>     printSolvedExpr i     "y_R1 = " asRadial [("x",0.1)] y1
+>     printSolvedExpr i     "y_R2 = " asRadial [("x",0.9)] y2
+>     printSolvedVariable i "R1   = " asRadial "R1"
+>     printSolvedVariable i "R2   = " asRadial "R2"
+>     --printValues i asRadial y   "x" [0,10..100]
+>     --printValues i asRadial y1  "x" [100,200..500]
+>     --printValues i asRadial y1f "x" [500,600..900]
+>     --printValues i asRadial y2  "x" [900,1000]
+>     let x = Symbol "x"
+>         r = Symbol "R" -- axial reaction
+>         zr  = Symbol "C" + x
+>         zr1 = Symbol "C" + x - (x - pv b meter)*r/(pv e pascal*(pv s meter2))
+>         zr2 = Symbol "C" + x - (pv a meter)*r/(pv e pascal*(pv s meter2))
+>         n = 10            -- n balls in bearing (one side only)
+>         ji = (1/n) .* ja  -- rigidity of one ball
+>         angles = map (pi/(n-1)*) [0..n-1]
+>         r1i = map (ballReactions ca d b zr y ji) angles
+>         r2i = map (ballReactions (-ca) d (b+.a) zr1 y1f ji) angles
+>         ra1 = foldl (+) 0 $ map fst r1i
+>         ra2 = foldl (+) 0 $ map fst r2i
+>         rr1 = foldl (+) 0 $ map snd r1i
+>         rr2 = foldl (+) 0 $ map snd r2i
+>     let eqlistAngular = (freeEnd desc (0.*mm) y ++
+>                          freeEnd desc (a+.b) y2 ++
+>                          [ra1 `Equal` r] ++
+>                          [ra2 `Equal` (-r)] ++
+>                          [rr1 `Equal` Symbol "R1"] ++
+>                          [rr2 `Equal` Symbol "R2"] ++
+>                          [subst [("x", pv c meter)] zr1 `Equal` pv c meter])
+>     --asAngular <- eval i $ solve eqlistAngular ["A0", "A1", "A2", "A3",
+>     --                                            "R", "C", "R1", "R2"]
+>     --print asAngular -- ^^ this system is not solved
+>     ---------------
+>     let br = map (ballReactions ca d b
+>                   (Symbol "Z0" + x) (Symbol "A0" + Symbol "A1" * x) ji) angles
+>         bra = foldl (+) 0 $ map fst br
+>         brr = foldl (+) 0 $ map snd br
+>         eqlist = [bra `Equal` 1, -- 1N axial force
+>                   brr `Equal` 0] -- no radial force
+>     --solution <- eval i $ solve eqlist ["A0", "A1", "Z0"]
+>     --print solution -- it solves only for two bearings (n=2)
+>                    -- maybe doesn't sum reactions, but only integrate?
+>     -- we use y0 and y'0 from previous calculations, z0 was searched manually
+>     -- so brr~=0.5 and this z is much (46 times) greater than it should be
+>     -- after axial deformation by bra.
+>     printSolvedExpr i "bra = " (List [List []])
+>                         [("Z0",0.000000046), ("A0", -1.085e-9), ("A1", -1.22e-7)] bra
+>     printSolvedExpr i "brr = " (List [List []])
+>                         [("Z0",0.000000046), ("A0", -1.085e-9), ("A1", -1.22e-7)] brr
+>     print $ CASExpr.eval $ (pv a meter)*1.17/(pv e pascal*(pv s meter2))
 
+> ballReactions alpha d b zr y ji beta = (rai, rri)
+>     where xi = pv d meter / 2 * cos beta
+>           yi = pv d meter / 2 * sin beta
+>           substb = subst [("x", pv b meter)]
+>           phi = substb (diff y "x")
+>           yiabs = yi * cos phi + substb y
+>           ziabs = yi * sin phi + substb zr
+>           r = sqrt $ xi**2 + yiabs**2
+>           z0 = pv b meter + pv d meter/(2*tan alpha)
+>           zc = z0 - r/tan alpha
+>           rai = (ziabs - zc) * pv ji (newton /. meter)
+>           rri = (rai / tan alpha) * sin beta
+
+
+> substSolution i solution pvlist expr = do
+>     let List [a] = solution
+>     f <- eval i $ Funcall CFSubst [substitute (Map.fromList pvlist) a,
+>                                    substitute (Map.fromList pvlist) expr]
+>     return $ f
+
+> printSolvedExpr i prefix solution pvlist expr = do
+>     v <- substSolution i solution pvlist expr
+>     putStrLn (prefix ++ show (CASExpr.eval v {-:: Era.CR-}))
+
+> printSolvedVariable i prefix solution symbol = do
+>     v <- substSolution i solution [] (Symbol symbol)
+>     putStrLn (prefix ++ show (CASExpr.eval v :: Era.CR))
 
 printValues prints `function` results (in mum) for `parameter`
 in `list` of values (in mm). `solution` is used to substitute all
 other parameters
 
 > printValues i solution function parameter list = do
->     let List [a] = solution
->     f <- eval i $ Funcall CFSubst [a, function]
+>     f <- substSolution i solution [] function
 >     mapM_ (\ i -> do let y = (CASExpr.eval $ substitute
 >                               (Map.fromList [(parameter, i)]) $
 >                               f * (meter /. micro meter)) :: Era.CR
