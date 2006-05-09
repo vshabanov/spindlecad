@@ -106,7 +106,7 @@ Angle
 
 > radian, degree :: NondimensionalValue
 > radian = 1
-> degree = pi / 360
+> degree = pi / 180
 
 Unsorted
 
