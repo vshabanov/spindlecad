@@ -37,6 +37,7 @@ Squares
 
 > square a = a *. a
 
+> type Meter2 = Dimension (Succ One) Zero Zero Zero Zero Zero Zero
 > meter2    = square meter
 > kilogram2 = square kilogram
 > second2   = square second
@@ -49,6 +50,7 @@ Cubes
 
 > cube a = a *. a *. a
 
+> type Meter3 = Dimension (Succ (Succ One)) Zero Zero Zero Zero Zero Zero
 > meter3    = cube meter
 > kilogram3 = cube kilogram
 > second3   = cube second
@@ -59,6 +61,7 @@ Cubes
 
 Fourths
 
+> type Meter4 = Dimension (Succ (Succ (Succ One))) Zero Zero Zero Zero Zero Zero
 > meter4    = square meter2
 > kilogram4 = square kilogram2
 > second4   = square second2
@@ -94,6 +97,11 @@ Volume.
 Rigidity
 
 > type NewtonDivMeter = Dimension Zero One (Neg (Succ One)) Zero Zero Zero Zero
+
+Bending Moment
+
+> type NewtonMulMeter =
+>     Dimension (Succ One) One (Neg (Succ One)) Zero Zero Zero Zero
 
 Rotational speed, frequency
 

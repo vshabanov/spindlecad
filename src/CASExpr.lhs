@@ -26,6 +26,7 @@ to operate with.
 > import Data.Ratio
 > import Data.IORef
 > import qualified Data.Map as Map
+> import ExactNumber
 
 Abstract CAS expression.
 The CAS expression is an abstraction layer over any maxima-like CAS system.
@@ -60,7 +61,7 @@ Thoughts:
 >              | Equal CASExpr CASExpr
 >              | List [CASExpr]
 >              | Funcall CASFunction [CASExpr]
->                deriving (Eq, Show)
+>                deriving (Show)
 
 Predefined CAS functions. We use maxima protocol by default.
 All other systems must follow this protocol for compability
@@ -109,16 +110,16 @@ Some utility
 
 CASExpr evaluation for specified num type.
 We can use any Floating number type to calculate results.
-Here some examples (Era.CR is from /src/ThirdParty):
+Here some examples:
 
 eval (sin pi) :: Float          => -8.742278e-8
 eval (sin pi) :: Double         => 1.2246063538223773e-16
-eval (sin pi) :: Era.CR         => 0.0000000000000000000000000000000000000000
+eval (sin pi) :: ExactNumber    => 0.0000000000000000000000000000000000000000
 eval (log cas_e) :: Float       => 0.99999994
 eval (log cas_e) :: Double      => 1.0
-eval (log cas_e) :: Era.CR      => 1.0000000000000000000000000000000000000000
+eval (log cas_e) :: ExactNumber => 1.0000000000000000000000000000000000000000
 eval pi                         => 3.141592653589793
-eval pi :: Era.CR               => 3.1415926535897932384626433832795028841972
+eval pi :: ExactNumber          => 3.1415926535897932384626433832795028841972
 
 Remark that Double is a default.
 
@@ -151,9 +152,9 @@ Remark that Double is a default.
 >         CFATanh -> atanh
 >         _ -> error ("CASExpr.eval not supported for: " ++ show e)
 >      ) (eval a)
-> eval e = if e == cas_pi then pi
->          else if e == cas_e then exp 1
->          else error ("CASExpr.eval not supported for: " ++ show e)
+> eval (Symbol "_cas_pi") = pi
+> eval (Symbol "_cas_e") = exp 1
+> eval e = error ("CASExpr.eval not supported for: " ++ show e)
 
 CASExpr symbol substitution (with evaluation or Integer/Rational afterwards)
 
@@ -254,15 +255,37 @@ TODO: rework ordering and enumerations, they are work in simple cases
 like [0..10]::[CASExpr], but error in something containing symbols. 
 Hmm. maybe its OK?
 
+Eq
+Remark that Eq use exact comparison. Its slow but its a right thing.
+Use inexactEq if you want to things go faster.
+TODO: maybe add symbolicEq
+
+> instance Eq CASExpr where
+>     x == y = ex == ey
+>         where ex = eval x :: ExactNumber
+>               ey = eval y :: ExactNumber
+
+> inexactEq :: CASExpr -> CASExpr -> Bool
+> inexactEq a b = inexactCompare a b == EQ
+
 Ord
 
 > instance Ord CASExpr where
 >     compare x y | ex == ey  = EQ
 >                 | ex <= ey  = LT
 >                 | otherwise = GT
->         where ex = eval x
->               ey = eval y
+>         where ex = eval x :: ExactNumber
+>               ey = eval y :: ExactNumber
 
+The Ord uses exact comparison, but for performance reasons its often
+enough to use inexact comparison below.
+
+> inexactCompare :: CASExpr -> CASExpr -> Ordering
+> inexactCompare x y | ex == ey  = EQ
+>                    | ex <= ey  = LT
+>                    | otherwise = GT
+>     where ex = eval x :: Double
+>           ey = eval y :: Double
 
 Enum
 

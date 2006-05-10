@@ -31,7 +31,7 @@ system of equations that describes particular spindle.
 > import Material
 > import MaterialsList
 > import Bearing
-> import BearingsList
+> import BearingsList hiding (bearings)
 > import Maxima
 > import TypeLevelPhysicalDimension
 > import TypeLevelPhysicalValue
@@ -39,7 +39,7 @@ system of equations that describes particular spindle.
 > import Data.Ratio
 > import Text.Printf
 > import qualified Data.Map as Map
-> import qualified ThirdParty.Era as Era
+> import ExactNumber
 
 
 The beam can be described using following differential equation
@@ -143,6 +143,42 @@ and don't change values if they are already CASExpr.
 >     physicalValueToCASExpr a d = a /. d
 
 
+Spindle description data type.
+
+> type Spindle = [Section]
+> data Section = Section { momentOfInertia :: Value Meter4,
+>                          material :: Material,
+>                          sectionLength :: Value Meter,
+>                          forces :: Map.Map (Value Meter) Force,
+>                          bearings :: Map.Map (Value Meter) Bearing 
+>                        }
+>                deriving (Eq, Ord, Show)
+> data Force = Force { radialForce :: Value Newton,
+>                      bendingMoment :: Value NewtonMulMeter 
+>                    }
+>              deriving (Eq, Ord, Show)
+
+Spindle construction functions.
+All dimensions in millimeters.
+Steel is default material.
+
+> cylinder :: CASExpr -> CASExpr -> Spindle
+> cylinder d l = [Section { momentOfInertia = jCircle (d.*mm) .* meter4,
+>                           material = steel,
+>                           sectionLength = l.*mm,
+>                           forces = Map.empty,
+>                           bearings = Map.empty 
+>                         }]
+
+> cone :: CASExpr -> CASExpr -> CASExpr -> Spindle
+> cone d1 d2 l = [Section { momentOfInertia =
+>                           jCircle (((d2-d1)*Symbol "x"/l + d1).*mm) .* meter4,
+>                           material = steel,
+>                           sectionLength = l.*mm,
+>                           forces = Map.empty,
+>                           bearings = Map.empty 
+>                         }]
+
 --------------------------------------------------------------------------------
 
 Test case #1.
@@ -177,20 +213,16 @@ Parameters:
 >         sf = s  + partialSolutionRadialForce desc (1.*newton) c
 >         s1 = sf + partialSolutionRadialForce desc (Symbol "R1") b
 >         s2 = s1 + partialSolutionRadialForce desc (Symbol "R2") (a+.b)
->     let eqlist = --map (substitute constants)--Map.empty)
->                  (freeEnd desc c s ++
+>     let eqlist = (freeEnd desc c s ++
 >                   freeEnd desc (a+.b) s2 ++
 >                   radialBearing desc b (Symbol "R1") j s1 ++
 >                   radialBearing desc (a+.b) (Symbol "R2") j s2)
->     --print eqlist
 >     r <- eval i $ solve eqlist ["A0", "A1", "A2", "A3", "R1", "R2"]
->     --print r
 >     let List [a] = r
 >     y0 <- eval i $ Funcall CFSubst [a, sf]
->     --print y0
 >     mapM_ (\ i -> do let y = (CASExpr.eval $
 >                               substitute (Map.fromList [("x", i)]) y0)
->                              ::Era.CR
+>                              :: ExactNumber
 >                      --printf "%.5f\n" $ y * (meter /. micro meter)))
 >                      print $ y * CASExpr.eval (meter /. micro meter))
 >               (map (* (mm /. meter)) [0,10..100])
@@ -314,11 +346,11 @@ Parameters:
 
 > printSolvedExpr i prefix solution pvlist expr = do
 >     v <- substSolution i solution pvlist expr
->     putStrLn (prefix ++ show (CASExpr.eval v {-:: Era.CR-}))
+>     putStrLn (prefix ++ show (CASExpr.eval v {-:: ExactNumber -}))
 
 > printSolvedVariable i prefix solution symbol = do
 >     v <- substSolution i solution [] (Symbol symbol)
->     putStrLn (prefix ++ show (CASExpr.eval v :: Era.CR))
+>     putStrLn (prefix ++ show (CASExpr.eval v :: ExactNumber))
 
 printValues prints `function` results (in mum) for `parameter`
 in `list` of values (in mm). `solution` is used to substitute all
@@ -328,7 +360,7 @@ other parameters
 >     f <- substSolution i solution [] function
 >     mapM_ (\ i -> do let y = (CASExpr.eval $ substitute
 >                               (Map.fromList [(parameter, i)]) $
->                               f * (meter /. micro meter)) :: Era.CR
+>                               f * (meter /. micro meter)) :: ExactNumber
 >                      putStrLn (show (truncate $ CASExpr.eval $
 >                                      i .* meter /. mm)
 >                                ++ "\t" ++ show y))

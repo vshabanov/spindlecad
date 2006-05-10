@@ -22,8 +22,15 @@ This module contains the exact number data type and operations on it.
 
 > module ExactNumber where
 
+> import qualified ThirdParty.Era
+
+For the moment this module is only abstract user from underlying
+exact number arithmetic library.
+
+> type ExactNumber = ThirdParty.Era.CR
+
 WARNING!
-DON'T SEE BELOW. THIS MODULE IS SUBJECT TO REMOVE.
+DON'T SEE BELOW. THESE THOUGHTS ARE VERY RAW.
 
 After some thoughts I decided that CASExpr and exact numbers
 must be completely separated. CASExpr must only contatin Integer
@@ -38,6 +45,11 @@ which contain already calculated exact numbers (with track of CASExpr-s
 that can be used for passing to maxima or saving/loading) may be more
 performance wise. But its a mess and completely unnecessary for now.
 
+Also, exact real number can contain part evaluated until some precision
+and some *finite* data of how to generate the rest. If so we can also
+save evaluated part of real numbers and considerably reduce further evaluation
+times.
+
 We will return here when start work with contraint database.
 (CDB will be used for saving/restoring our calculations, drawings,
 tables, guis and so on)
@@ -49,29 +61,29 @@ http://www.cs.man.ac.uk/arch/dlester/exact.html
 For more information about libraries for exact arithmetic see:
 http://www.haskell.org/haskellwiki/Exact_real_arithmetic
 
-> import qualified ThirdParty.Era as Era
+-- > import qualified ThirdParty.Era as Era
 
 For finite representation of number we keep CASExpr which
 can be used to calculate number from scratch.
 Finite representation is useful for reading
 or writing numbers, so that precision is not loosed.
 
-> import CASExpr
+-- > import CASExpr
 
 The exact number is built from integers or rationals, or
 from some predefined constants like pi.
 
-> import Data.Ratio
+-- > import Data.Ratio
 
 The type of exact number itself is a following sum type:
 
-> data EN = Integer Integer
->         | Rational Rational
->         | ExactReal CASExpr Era.CR
->         | NegInfinity
->         | Infinity
->         | NaN
->           deriving (Show)
+-- > data EN = Integer Integer
+-- >         | Rational Rational
+-- >         | ExactReal CASExpr Era.CR
+-- >         | NegInfinity
+-- >         | Infinity
+-- >         | NaN
+-- >           deriving (Show)
 
 TODO:
  - exact computations are too long even for simple numbers
