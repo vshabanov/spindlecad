@@ -48,7 +48,8 @@ FAG hi-precision spindle bearings
 >       attainableSpeedOil = 22000 .* rpm,
 >       preloadingForce = 211 .* newton,
 >       unloadingForce = 658 .* newton,
->       axialRigidity = 64.5 .* newton /. micro meter
+>       axialRigidity = (64.5/2) .* newton /. micro meter
+>                         -- ^ half because of Sa given for bearing pair
 >     }
 
 > fagB7015C_2RSD_T_P4S_UL = AngularContactBearing -- page 46-47
@@ -65,7 +66,7 @@ FAG hi-precision spindle bearings
 >       attainableSpeedOil = 19000 .* rpm,
 >       preloadingForce = 283 .* newton,
 >       unloadingForce = 880 .* newton,
->       axialRigidity = 76.8 .* newton /. micro meter
+>       axialRigidity = (76.8/2) .* newton /. micro meter
 >     }
 
 > fagB7012C_2RSD_T_P4S_UL_asRadial =
