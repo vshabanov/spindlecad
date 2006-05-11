@@ -159,7 +159,7 @@ Spindle description data type.
 >              deriving (Eq, Ord, Show)
 
 Spindle construction functions.
-All dimensions in millimeters.
+All dimensions in millimeters, forces in newtons, moments in newton*meter.
 Steel is default material.
 
 > cylinder :: CASExpr -> CASExpr -> Spindle
@@ -178,6 +178,29 @@ Steel is default material.
 >                           forces = Map.empty,
 >                           bearings = Map.empty 
 >                         }]
+
+> addRadialForce :: Spindle -> CASExpr -> CASExpr -> Spindle
+> addRadialForce sp force coordinate = modifySectionAt addrf sp coordinate
+>     where addrf s c = s { forces = Map.insert (c .* mm)
+>                           (Force { radialForce = force .* newton,
+>                                    bendingMoment = 0 .* newton *. meter })
+>                           (forces s) }
+
+> addBearing :: Spindle -> Bearing -> CASExpr -> Spindle
+> addBearing sp bearing coordinate = modifySectionAt addb sp coordinate
+>     where addb s c =
+>               s { bearings = Map.insert (c .* mm) bearing (bearings s) }
+
+modifySectionAt find a section at specified coordinate and modify it
+using function passed at first argument.
+
+> modifySectionAt :: (Section -> CASExpr -> Section)
+>                 -> Spindle -> CASExpr -> Spindle
+> modifySectionAt mf [] c = error "modifySectionAt: coordinate too large"
+> modifySectionAt mf (x:xs) c =
+>     if c <= (sectionLength x /. mm)
+>        then mf x c : xs
+>        else modifySectionAt mf xs (c - sectionLength x /. mm)
 
 --------------------------------------------------------------------------------
 

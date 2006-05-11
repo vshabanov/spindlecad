@@ -67,3 +67,8 @@ FAG hi-precision spindle bearings
 >       unloadingForce = 880 .* newton,
 >       axialRigidity = 76.8 .* newton /. micro meter
 >     }
+
+> fagB7012C_2RSD_T_P4S_UL_asRadial =
+>     radialBearingFromAngular 6 fagB7012C_2RSD_T_P4S_UL
+> fagB7015C_2RSD_T_P4S_UL_asRadial =
+>     radialBearingFromAngular 6 fagB7015C_2RSD_T_P4S_UL
