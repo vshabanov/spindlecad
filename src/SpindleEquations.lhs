@@ -128,21 +128,6 @@ Areas.
 > areaOfCircle d = pi/4 * pv d meter**2
 
 
-Utility type class which convert physical values to CAS values
-and don't change values if they are already CASExpr.
-
-> pv v t = physicalValueToCASExpr v t
-
-> class PhysicalValueToCASExpr v t where
->     physicalValueToCASExpr :: v -> t -> CASExpr
-
-> instance PhysicalValueToCASExpr CASExpr (Value a) where
->     physicalValueToCASExpr a _ = a
-> instance (DimensionDivide a a NonDim) =>
->     PhysicalValueToCASExpr (Value a) (Value a) where
->     physicalValueToCASExpr a d = a /. d
-
-
 Spindle description data type.
 
 > type Spindle = [Section]
@@ -158,9 +143,12 @@ Spindle description data type.
 >                    }
 >              deriving (Eq, Ord, Show)
 
+
 Spindle construction functions.
 All dimensions in millimeters, forces in newtons, moments in newton*meter.
 Steel is default material.
+
+Cylindrical section description.
 
 > cylinder :: CASExpr -> CASExpr -> Spindle
 > cylinder d l = [Section { momentOfInertia = jCircle (d.*mm) .* meter4,
@@ -169,6 +157,8 @@ Steel is default material.
 >                           forces = Map.empty,
 >                           bearings = Map.empty 
 >                         }]
+
+Conical section description.
 
 > cone :: CASExpr -> CASExpr -> CASExpr -> Spindle
 > cone d1 d2 l = [Section { momentOfInertia =
@@ -179,28 +169,131 @@ Steel is default material.
 >                           bearings = Map.empty 
 >                         }]
 
-> addRadialForce :: Spindle -> CASExpr -> CASExpr -> Spindle
-> addRadialForce sp force coordinate = modifySectionAt addrf sp coordinate
->     where addrf s c = s { forces = Map.insert (c .* mm)
+Something `at` specified coordinate description.
+
+> at :: a -> CASExpr -> (a, Value Meter)
+> at a b = (a, b.*mm)
+
+Radial force description.
+
+> addRadialForce :: Spindle -> (CASExpr, Value Meter) -> Spindle
+> addRadialForce sp (force, c) = modifySectionAt addrf sp c
+>     where addrf s c = s { forces = Map.insert c
 >                           (Force { radialForce = force .* newton,
 >                                    bendingMoment = 0 .* newton *. meter })
 >                           (forces s) }
 
-> addBearing :: Spindle -> Bearing -> CASExpr -> Spindle
-> addBearing sp bearing coordinate = modifySectionAt addb sp coordinate
+Bearing description.
+
+> addBearing :: Spindle -> (Bearing, Value Meter) -> Spindle
+> addBearing sp (bearing, c) = modifySectionAt addb sp c
 >     where addb s c =
->               s { bearings = Map.insert (c .* mm) bearing (bearings s) }
+>               s { bearings = Map.insert c bearing (bearings s) }
+
+Sequential spindle connection.
+
+> (<+>) :: Spindle -> Spindle -> Spindle
+> (<+>) = (++)
+
+Spindle bore description. The bore is just another spindle of equal length
+which is cut from base spindle.
+
+> cut :: Spindle -> Spindle -> Spindle
+> cut = unionSpindles cutSection
+>     where cutSection base bore =
+>               base { momentOfInertia =
+>                      momentOfInertia base -. momentOfInertia bore }
+
+Fixities for construction functions and operators
+
+> infixl 9 `at`                 -- maximal fixity
+> infixl 8 `addRadialForce`     -- same fixity as ^, but left associative
+> infixl 8 `addBearing`         -- same fixity as ^, but left associative
+> infixl 6 `cut`                -- same fixity as -
+> infixr 5 <+>                  -- same fixity as ++
+
+Spindle construction functions utilities.
 
 modifySectionAt find a section at specified coordinate and modify it
 using function passed at first argument.
 
-> modifySectionAt :: (Section -> CASExpr -> Section)
->                 -> Spindle -> CASExpr -> Spindle
+> modifySectionAt :: (Section -> Value Meter -> Section)
+>                 -> Spindle -> Value Meter -> Spindle
 > modifySectionAt mf [] c = error "modifySectionAt: coordinate too large"
 > modifySectionAt mf (x:xs) c =
->     if c <= (sectionLength x /. mm)
+>     if c <= (sectionLength x)
 >        then mf x c : xs
->        else modifySectionAt mf xs (c - sectionLength x /. mm)
+>        else x : modifySectionAt mf xs (c -. sectionLength x)
+
+unionSpindles - unions two spindles using section union function.
+    |---1---|---2---|---3---|
+             `union`
+    |-----1'----|-----2'----|
+                =
+    |---a---|-b-|-c-|---d---|
+where a = sectionUnion 1 (fst (splitSection 1' (length 1)))
+      b = sectionUnion (fst (splitSection 2 (length 1' - length 1)))
+                       (snd (splitSection 1' (length 1)))
+      ..., etc.
+
+> unionSpindles :: (Section -> Section -> Section)
+>               -> Spindle -> Spindle -> Spindle
+> unionSpindles sectionUnion sp1 sp2 = u sp1 sp2
+>     where u [] [] = []
+>           u [] a  = error "unionSpindles: spinle1 is shorted than spindle2"
+>           u a  [] = error "unionSpindles: spinle2 is shorted than spindle1"
+>           u (s1:xs1) (s2:xs2) =
+>               if sectionLength s1 == sectionLength s2 then
+>                  sectionUnion s1 s2 : u xs1 xs2
+>               else if sectionLength s1 < sectionLength s2 then
+>                  let (s2a,s2b) = splitSection s2 (sectionLength s1) in
+>                  sectionUnion s1 s2a : u xs1 (s2b:xs2)
+>               else
+>                  let (s1a,s1b) = splitSection s1 (sectionLength s2) in
+>                  sectionUnion s1a s2 : u (s1b:xs1) xs2
+
+
+splitSection splits section at specified coordinate.
+
+> splitSection :: Section -> Value Meter -> (Section, Section)
+> splitSection s l =
+>     if sectionLength s < l
+>        then error "splitSection: section is shorter than specified coordinate"
+>        else (s { sectionLength = l,
+>                  forces = Map.filterWithKey   (\ k _ -> k <= l) $ forces s,
+>                  bearings = Map.filterWithKey (\ k _ -> k <= l) $ bearings s
+>                },
+>              s { momentOfInertia = substitutepv [("x", Symbol "x" + l/.meter)]
+>                    (momentOfInertia s),
+>                  sectionLength = sectionLength s -. l,
+>                  forces =   Map.mapKeys (\ k -> k -. l) $
+>                    Map.filterWithKey (\ k _ -> k > l) $ forces s,
+>                  bearings = Map.mapKeys (\ k -> k -. l) $
+>                    Map.filterWithKey (\ k _ -> k > l) $ bearings s
+>                })
+
+
+General utilities.
+
+substitutepv - same as CASExpr.substitute but for physical values
+
+> substitutepv :: [(String, CASExpr)] -> Value a -> Value a
+> substitutepv s (Value v) = Value (substitute (Map.fromList s) v)
+
+Utility type class which convert physical values to CAS values
+and don't change values if they are already CASExpr.
+
+> pv v t = physicalValueToCASExpr v t
+
+> class PhysicalValueToCASExpr v t where
+>     physicalValueToCASExpr :: v -> t -> CASExpr
+
+> instance PhysicalValueToCASExpr CASExpr (Value a) where
+>     physicalValueToCASExpr a _ = a
+> instance (DimensionDivide a a NonDim) =>
+>     PhysicalValueToCASExpr (Value a) (Value a) where
+>     physicalValueToCASExpr a d = a /. d
+
 
 --------------------------------------------------------------------------------
 
@@ -388,3 +481,31 @@ other parameters
 >                                      i .* meter /. mm)
 >                                ++ "\t" ++ show y))
 >               (map (* (mm /. meter)) list)
+
+
+Test case #3.
+The spindle of machine tool used in course work.
+Console force of 1N and five FAG bearings.
+For the moment we use simplified geometry, to compare our results with these
+from Autodesk Inventor's Shaft Component Generator.
+
+> testCase3 =
+>     -- shaft
+>     ((cyl 82.6 13 <+> cyl 133 30.5 <+> cyl 75 (53+94.5) <+> cyl 125 (42.5+50)
+>          <+> cyl 60 (40+22.5) <+> cyl 57 94)
+>     `cut`
+>     (cyl 55 13 <+> cyl 50 30.5 <+> cyl 45 53 <+> cyl 40 94.5
+>          <+> cyl 35 (42.5+50+40+22.5+94)))
+>     -- forces
+>     `addRadialForce` 1 `at` 0
+>     -- front bearing set
+>     `addBearing` fagB7015C `at` (13+30.5+27.5)
+>     `addBearing` fagB7015C `at` (13+30.5+47.5)
+>     `addBearing` fagB7015C `at` (13+30.5+53+26.5)
+>     -- rear bearing set
+>     `addBearing` fagB7012C `at` (13+30.5+53+94.5+42.5+50+32.5)
+>     `addBearing` fagB7012C `at` (13+30.5+53+94.5+42.5+50+40+7)
+>     -- end
+>   where cyl = cylinder
+>         fagB7015C = fagB7015C_2RSD_T_P4S_UL_asRadial
+>         fagB7012C = fagB7012C_2RSD_T_P4S_UL_asRadial
