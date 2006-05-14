@@ -261,6 +261,10 @@ Use inexactEq if you want to things go faster.
 TODO: maybe add symbolicEq
 
 > instance Eq CASExpr where
+>     (Integer x)  == (Integer y)  = x == y
+>     (Rational x) == (Rational y) = x == y
+>     (Integer x)  == (Rational y) = denominator y == 1 && numerator y == x
+>     (Rational x) == (Integer y)  = denominator x == 1 && numerator x == y
 >     x == y = ex == ey
 >         where ex = eval x :: ExactNumber
 >               ey = eval y :: ExactNumber
@@ -271,6 +275,10 @@ TODO: maybe add symbolicEq
 Ord
 
 > instance Ord CASExpr where
+>     compare (Integer x)  (Integer y)  = compare x y
+>     compare (Rational x) (Rational y) = compare x y
+>     compare (Integer x)  (Rational y) = compare (x%1) y
+>     compare (Rational x) (Integer y)  = compare x (y%1)
 >     compare x y | ex == ey  = EQ
 >                 | ex <= ey  = LT
 >                 | otherwise = GT

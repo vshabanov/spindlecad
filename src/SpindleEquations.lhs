@@ -42,92 +42,6 @@ system of equations that describes particular spindle.
 > import ExactNumber
 
 
-The beam can be described using following differential equation
-
-    diff(y, x, 4)*E*J = p(x)
-
-  where   
-    y    - deflection at point x
-    E    - modulus of elasticty of material
-    J    - moment of inertia
-    p(x) - distributed load
-
-Solution of this equation is
-
-    y*E*J = A0 + A1*x + A2*x^2 + A3*x^3 + F(x)
-
-  where
-    Ai   - constants which depends on solution of equation system
-    F(x) - partial solution which depends on force
-
-Equation system consists of boundary conditions for the beam.
-
-
-General solution
-    A0 + A1*x + A2*x^2 + A3*x^3
-    ---------------------------
-               E*J
-
-> generalSolution desc =
->     divEJ desc $ s "A0" + s "A1" * x + s "A2" * x**2 + s "A3" * x**3
->     where s = symbol desc
->           x = s "x"
-
-> divEJ  (prefix, e, j) = (/ (pv e pascal * pv j meter4))
-> symbol (prefix, e, j) a = Symbol (prefix ++ a)
-> prefix (p, _, _) = p
-
-Partial solutions.
-
-Radial force
-    -P/6*(x-a)^3
-    ------------
-        E*J
-
-> partialSolutionRadialForce desc force coordinate =
->     divEJ desc $ -pv force newton/6 * (x-pv coordinate meter)**3
->     where s = symbol desc
->           x = s "x"
-
-Bending moment
-    -M/2*(x-a)^2
-    ------------
-        E*J
-
-> partialSolutionBendingMoment desc moment coordinate =
->     divEJ desc $ -pv moment (newton *. meter)/2 * (x-pv coordinate meter)**2
->     where s = symbol desc
->           x = s "x"
-
-Boundary conditions.
-  
-Free end.
-    y'' = 0, y''' = 0
-
-> freeEnd desc coordinate rhs =
->     [subst [(x, pv coordinate meter)] (diffn rhs x 2) `Equal` 0,
->      subst [(x, pv coordinate meter)] (diffn rhs x 3) `Equal` 0]
->     where x = prefix desc ++ "x"
-
-Radial bearing
-    y = R/j
-
-> radialBearing desc coordinate r j rhs =
->     [(pv r newton / pv j (newton /. meter))
->      `Equal` subst [(x, pv coordinate meter)] rhs]
->     where x = prefix desc ++ "x"
-
-
-Moment inertia of circle
-    pi/64*d^4
-
-> jCircle d = pi/64 * pv d meter**4
-
-Areas.
-
-> areaOfCircle d = pi/4 * pv d meter**2
-
-
 Spindle description data type.
 
 > type Spindle = [Section]
@@ -273,7 +187,187 @@ splitSection splits section at specified coordinate.
 >                })
 
 
+Querying properties of described spindle.
+
+... deflectionLine sp -> [(x,y)]
+... reactions sp -> [(x,bearing,r)]
+... deflectionOf spindleDecr `at` 0
+
+
+To get the properties of spindle we first need to solve equation system
+corresponding to concrete spindle description.
+
+The spindle is modeled as beam on elastic bearings.
+
+The beam can be described using following differential equation
+
+    diff(y, x, 4)*E*J = p(x)
+
+  where   
+    y    - deflection at point x
+    E    - modulus of elasticty of material
+    J    - moment of inertia
+    p(x) - distributed load
+
+Solution of this equation is
+
+    y*E*J = A0 + A1*x + A2*x^2 + A3*x^3 + F(x)
+
+  where
+    Ai   - constants which depends on solution of equation system
+    F(x) - partial solution which depends on force
+
+Equation system consists of boundary conditions for the beam.
+
+
+General solution
+        A0 + A1*x + A2*x^2 + A3*x^3
+    y = ---------------------------
+                   E*J
+
+> generalSolution desc =
+>     divEJ desc $ s "A0" + s "A1" * x + s "A2" * x**2 + s "A3" * x**3
+>     where s = symbol desc
+>           x = s "x"
+
+> divEJ  (prefix, e, j) = (/ (pv e pascal * pv j meter4))
+> symbol (prefix, e, j) a = Symbol (prefix ++ a)
+> prefix (p, _, _) = p
+
+
+Partial solutions.
+They are added to deflection (y) at the point where load is changed.
+E.g. y_new = y + partialSolution
+
+Radial force
+    -P/6*(x-a)^3
+    ------------
+        E*J
+
+> partialSolutionRadialForce desc force coordinate =
+>     divEJ desc $ -pv force newton/6 * (x-pv coordinate meter)**3
+>     where s = symbol desc
+>           x = s "x"
+
+Bending moment
+    -M/2*(x-a)^2
+    ------------
+        E*J
+
+> partialSolutionBendingMoment desc moment coordinate =
+>     divEJ desc $ -pv moment (newton *. meter)/2 * (x-pv coordinate meter)**2
+>     where s = symbol desc
+>           x = s "x"
+
+
+Boundary conditions.
+  
+Free end.
+    y'' = 0, y''' = 0
+
+> freeEnd desc coordinate rhs =
+>     [subst [(x, pv coordinate meter)] (diffn rhs x 2) `Equal` 0,
+>      subst [(x, pv coordinate meter)] (diffn rhs x 3) `Equal` 0]
+>     where x = prefix desc ++ "x"
+
+Connected sections.
+    y1(l)  = y2(0)                      - deflection equality
+    y1'(l) = y2'(0)                     - angles equality
+    y1''(l)*E1*J1 = y2''(0)*E2*J2       - forces equality
+    y1'''(l)*E1*J1 = y2'''(0)*E2*J2     - moments equality
+
+ > connected y1 section1 y2 section2 =
+ >     
+
+Radial bearing
+    y = R/j
+
+> radialBearing desc coordinate r j rhs =
+>     [(pv r newton / pv j (newton /. meter))
+>      `Equal` subst [(x, pv coordinate meter)] rhs]
+>     where x = prefix desc ++ "x"
+
+
+Work with deflection line segments.
+
+sectionDeflections returns list of (valid length, deflection function) pairs.
+Deflection function is changed after each force or bearing applied.
+Prefix is added to all variabled used to describe beam or bearing reaction,
+i.e. A0...A3 become (prefix++A0...) and all reactions become prefixR1,2,...
+
+> type SectionDeflections = [(CASExpr, CASExpr)]
+
+> sectionDeflections :: String -> Section -> SectionDeflections
+> sectionDeflections prefix section =
+>       sd (generalSolution desc)
+>              1 -- start bearing number to use in prefixR1,2,...
+>              0 -- start coordinate
+>              (toList $ forces section) (toList $ bearings section)
+>     where desc = (prefix,
+>                   modulusOfElasticity (material section) /. pascal, -- E
+>                   substitute (Map.fromList [("x", Symbol (prefix++"x"))]) $
+>                       momentOfInertia section /. meter4) -- J
+>           toList = map (\(c, a) -> (c /. meter, a)) . Map.toList
+>                      -- we convert coordinates to undimensioned CASExpr
+>           sd y bn c [] [] = [(sectionLength section /. meter - c, y)]
+>           sd y bn c ((fc, f):fs) [] = addF y bn c fc f fs []
+>           sd y bn c [] ((bc, b):bs) = addB y bn c bc b [] bs
+>           sd y bn c ((fc, f):fs) ((bc, b):bs) =
+>               if fc <= bc
+>                  then addF y bn c fc f fs ((bc, b):bs)
+>                  else addB y bn c bc b ((fc, f):fs) bs
+>           addF y bn c fc f fs bs = (fc-c,y) : sd ynew bn fc fs bs
+>               where ynew = if rf /= 0
+>                            then ynew' + partialSolutionRadialForce desc rf fc
+>                            else ynew'
+>                     ynew' = if bm /= 0
+>                            then y + partialSolutionBendingMoment desc bm fc
+>                            else y
+>                     rf = radialForce f /. newton
+>                     bm = bendingMoment f /. (newton*.meter)
+>           addB y bn c bc b fs bs =
+>               (bc-c,y) -- length = bearing coordinate - start coordinate
+>               : sd (y + partialSolutionRadialForce desc
+>                     (Symbol $ prefix ++ "R" ++ show bn)
+>                     -- ^ we don't know bearing reaction yet, it's our unknown
+>                     bc) (bn+1) bc fs bs
+>        
+
+> type SpindleDeflections = [(CASExpr, (Section, SectionDeflections))]
+
+ > spindleDeflections :: Spindle -> SpindleDeflections
+ > spindleDeflections 
+
+
+Equation system generation.
+
+...
+
+
 General utilities.
+
+Leftmost value from section list.
+Section list is a list of length-value pairs.
+
+> leftmost :: [(CASExpr, a)] -> CASExpr -> a
+> leftmost [] c = error "leftmost: coordinate is bigger than section list"
+> leftmost ((l,a):xs) c = if l >= c then a else leftmost xs (c-l)
+
+Rightmost value from section list.
+
+> rightmost :: [(CASExpr, a)] -> CASExpr -> a
+> rightmost [] c = error "rightmost: coordinate is bigger than section list"
+> rightmost ((l,a):x:xs) c = if l > c then a else rightmost (x:xs) (c-l)
+> rightmost ((l,a):xs) c = if l >= c then a else rightmost xs (c-l)
+
+Moment inertia of circle
+    pi/64*d^4
+
+> jCircle d = pi/64 * pv d meter**4
+
+Area of circle.
+
+> areaOfCircle d = pi/4 * pv d meter**2
 
 substitutepv - same as CASExpr.substitute but for physical values
 
