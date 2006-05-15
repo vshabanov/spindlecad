@@ -74,14 +74,18 @@ Cylindrical section description.
 
 Conical section description.
 
-> cone :: CASExpr -> CASExpr -> CASExpr -> Spindle
-> cone d1 d2 l = [Section { momentOfInertia =
->                           jCircle (((d2-d1)*Symbol "x"/l + d1).*mm) .* meter4,
->                           material = steel,
->                           sectionLength = l.*mm,
->                           forces = Map.empty,
->                           bearings = Map.empty 
->                         }]
+TODO: see comment on equation. to correctly solve conical sections we need to
+adjust our equation system generation.
+Therefore `cone` is now commented.
+
+ > cone :: CASExpr -> CASExpr -> CASExpr -> Spindle
+ > cone d1 d2 l = [Section { momentOfInertia =
+ >                           jCircle (((d2-d1)*Symbol "x"/l + d1).*mm) .* meter4,
+ >                           material = steel,
+ >                           sectionLength = l.*mm,
+ >                           forces = Map.empty,
+ >                           bearings = Map.empty 
+ >                         }]
 
 Something `at` specified coordinate description.
 
@@ -216,6 +220,20 @@ Solution of this equation is
   where
     Ai   - constants which depends on solution of equation system
     F(x) - partial solution which depends on force
+
+
+TODO: when J (or E) is not constant the solution is changed to one shown below.
+We must adjust our equation system generation so it automatically integrate
+
+(%i1) (integrate(integrate(integrate(integrate(y*E(x)*J(x)=p(x),x),x),x),x));
+      / / / /                           / / / /
+      [ [ [ [                           [ [ [ [
+(%o1) I I I I E(x)*J(x)*y dx dx dx dx = I I I I p(x) dx dx dx dx + 
+      ] ] ] ]                           ] ] ] ]
+      / / / /                           / / / /
+
+      + A0 + A1*x + A2*x^2 + A3*x^3
+
 
 Equation system consists of boundary conditions for the beam.
 
@@ -492,6 +510,7 @@ Parameters:
 > testCase1 = withInterpreter $ \i -> do
 >     let d = 100 .* mm
 >         sj = jCircle d
+>         --sj = jCircle (((110-100)*Symbol "x"/1000+100) .* mm)
 >         e = modulusOfElasticity steel
 >         desc = ("", e, sj)
 >         c = 0 .* mm
@@ -697,8 +716,8 @@ other parameters
 Test case #3.
 The spindle of machine tool used in course work.
 Console force of 1N and five FAG bearings.
-For the moment we use simplified geometry, to compare our results with these
-from Autodesk Inventor's Shaft Component Generator.
+Geometry is simplified against real spindle (many groves are removed),
+but for deflection calculation it's OK.
 
 > testCase3 = withInterpreter $ \i -> do
 >     s <- solveSpindleDeflections i testSpindle
@@ -707,20 +726,19 @@ from Autodesk Inventor's Shaft Component Generator.
 
 > testSpindle =
 >     -- shaft
->     ((cyl 82.6 13 <+> cyl 133 30.5 <+> cyl 75 (53+94.5) <+> cyl 125 (42.5+50)
->          <+> cyl 60 (40+22.5) <+> cyl 57 94)
->     `cut`
->     (cyl 55 13 <+> cyl 50 30.5 <+> cyl 45 53 <+> cyl 40 94.5
->          <+> cyl 35 (42.5+50+40+22.5+94)))
+>     ((cyl 82 13 <+> cyl 133 23 <+> cyl 120 8 <+> cyl 75 147.5
+>       <+> cyl 67 90 <+> cyl 60 62.5 <+> cyl 57 96)
+>      `cut`
+>      (cyl 55 30 <+> cyl 45 73 <+> cyl 35 337))
 >     -- forces
 >     `addRadialForce` 1 `at` 0
 >     -- front bearing set
->     `addBearing` fagB7015C `at` (13+30.5+27.5)
->     `addBearing` fagB7015C `at` (13+30.5+47.5)
->     `addBearing` fagB7015C `at` (13+30.5+53+26.5)
+>     `addBearing` fagB7015C `at` (44+27)
+>     `addBearing` fagB7015C `at` (44+47)
+>     `addBearing` fagB7015C `at` (44+79)
 >     -- rear bearing set
->     `addBearing` fagB7012C `at` (13+30.5+53+94.5+42.5+50+32.5)
->     `addBearing` fagB7012C `at` (13+30.5+53+94.5+42.5+50+40+7)
+>     `addBearing` fagB7012C `at` (281.5+31)
+>     `addBearing` fagB7012C `at` (281.5+49)
 >     -- end
 >   where cyl = cylinder
 >         fagB7015C = fagB7015C_2RSD_T_P4S_UL_asRadial
