@@ -273,11 +273,17 @@ Free end.
 Connected sections.
     y1(l)  = y2(0)                      - deflection equality
     y1'(l) = y2'(0)                     - angles equality
-    y1''(l)*E1*J1 = y2''(0)*E2*J2       - forces equality
-    y1'''(l)*E1*J1 = y2'''(0)*E2*J2     - moments equality
+    y1''(l)*E1*J1 = y2''(0)*E2*J2       - moments equality
+    y1'''(l)*E1*J1 = y2'''(0)*E2*J2     - forces equality
 
- > connected y1 section1 y2 section2 =
- >     
+> connected (prefix1,e1,j1) y1 l (prefix2,e2,j2) y2 =
+>     [y1 `eq` y2,
+>      diff y1 x1 `eq` diff y2 x2,
+>      diffn (y1*e1*j1) x1 2 `eq` diffn (y2*e2*j2) x2 2,
+>      diffn (y1*e1*j1) x1 3 `eq` diffn (y2*e2*j2) x2 3]
+>     where eq a b = subst [(x1, l)] a `Equal` subst [(x2, 0)] b
+>           x1 = prefix1 ++ "x"
+>           x2 = prefix2 ++ "x"
 
 Radial bearing
     y = R/j
@@ -295,14 +301,15 @@ Deflection function is changed after each force or bearing applied.
 Prefix is added to all variabled used to describe beam or bearing reaction,
 i.e. A0...A3 become (prefix++A0...) and all reactions become prefixR1,2,...
 
-> type SectionDeflections = [(CASExpr, CASExpr)]
+> type SectionDeflections = (String, [(CASExpr, CASExpr)])
 
 > sectionDeflections :: String -> Section -> SectionDeflections
 > sectionDeflections prefix section =
->       sd (generalSolution desc)
->              1 -- start bearing number to use in prefixR1,2,...
->              0 -- start coordinate
->              (toList $ forces section) (toList $ bearings section)
+>     (prefix,
+>      sd (generalSolution desc)
+>         1 -- start bearing number to use in prefixR1,2,...
+>         0 -- start coordinate
+>         (toList $ forces section) (toList $ bearings section))
 >     where desc = (prefix,
 >                   modulusOfElasticity (material section) /. pascal, -- E
 >                   substitute (Map.fromList [("x", Symbol (prefix++"x"))]) $
@@ -331,18 +338,85 @@ i.e. A0...A3 become (prefix++A0...) and all reactions become prefixR1,2,...
 >                     (Symbol $ prefix ++ "R" ++ show bn)
 >                     -- ^ we don't know bearing reaction yet, it's our unknown
 >                     bc) (bn+1) bc fs bs
->        
+
+> getSectionDeflection :: SectionDeflections -> CASExpr -> CASExpr
+> getSectionDeflection (prefix, sd) c =
+>     substitute (Map.fromList [(prefix++"x", (c/1000))]) $ leftmost sd (c/1000)
 
 > type SpindleDeflections = [(CASExpr, (Section, SectionDeflections))]
 
- > spindleDeflections :: Spindle -> SpindleDeflections
- > spindleDeflections 
+> spindleDeflections :: Spindle -> SpindleDeflections
+> spindleDeflections sp = spd 1 sp
+>     where spd sn [] = []
+>           spd sn (s:xs) = (sectionLength s /. meter,
+>                            (s, sectionDeflections ("s"++show sn) s))
+>                           : spd (sn+1) xs
+
+> getSpindleDeflection :: SpindleDeflections -> CASExpr -> CASExpr
+> getSpindleDeflection sd c = getSectionDeflection secd (coord*1000)
+>     where ((sec, secd), coord) = leftmost' sd (c/1000)
 
 
-Equation system generation.
+Spindle equation system generation.
 
-...
+The equation system.
 
+> spindleEquationSystem :: SpindleDeflections -> [CASExpr]
+> spindleEquationSystem [] = []
+> spindleEquationSystem (s:xs) =
+>     freeEnd (desc s) (0::CASExpr) (leftmost3 s 0)
+>     ++
+>     equationSystem s xs
+>   where -- description used in spindle equations (prefix, E, J)
+>         desc (l, (section, (prefix, defls))) =
+>             (prefix, modulusOfElasticity (material section) /. pascal,
+>              momentOfInertia section /. meter4)
+>             
+>         sectionBoundaryConditions s@(l, (sec, (prefix, sd))) = concat $
+>             map (\ ((c_m, bearing), bn) -> let c = c_m /. meter in
+>                  radialBearing (desc s) c (Symbol $ prefix ++ "R" ++ show bn)
+>                    (radialRigidity bearing) (rightmost sd c))
+>                 $ zipWith (,) (Map.toList $ bearings sec) [1..]
+>                   
+>         equationSystem s [] = sectionBoundaryConditions s ++
+>                               freeEnd (desc s) (l s) (rightmost3 s (l s))
+>         equationSystem s (ns:xs) =
+>             sectionBoundaryConditions s ++
+>             connected (desc s) (rightmost3 s (l s)) (l s)
+>                       (desc ns) (leftmost3 ns 0) 
+>                 ++ equationSystem ns xs
+>                    
+>         rightmost3 s = rightmost (snd $ snd $ snd s)
+>         leftmost3 s = leftmost (snd $ snd $ snd s)
+>         l s = sectionLength (fst $ snd s) /. meter
+
+Equation system unknowns.
+
+> spindleEquationSystemUnknowns :: SpindleDeflections -> [String]
+> spindleEquationSystemUnknowns [] = []
+> spindleEquationSystemUnknowns ((l,(section,(prefix,sd))):xs) =
+>     (map (prefix ++) $ ["A0", "A1", "A2", "A3"] ++
+>          map (\ bn -> "R" ++ show bn) [1..Map.size (bearings section)])
+>     ++
+>     spindleEquationSystemUnknowns xs
+
+
+Solving of spindle equation system using Maxima.
+
+> solveSpindleDeflections :: Interpreter -> Spindle -> IO SpindleDeflections
+> solveSpindleDeflections i s = do
+>     let sd = spindleDeflections s
+>     solution <- eval i $ solve (spindleEquationSystem sd)
+>                 (spindleEquationSystemUnknowns sd)
+>     --print solution
+>     let substSolution =
+>             case solution of
+>                 List [List a] -> substitute (Map.fromList $ map toSubs a)
+>                 _ -> error "solveSpindleDeflections: not solved"
+>             where toSubs (Equal (Symbol s) e) = (s, e)
+>                   toSubs _ = error "solveSpindleDeflections: invalid solution"
+>     return $ map (\ (l, (s, (p, sd))) ->
+>                   (l, (s, (p, map (\ (l,d) -> (l, substSolution d)) sd)))) sd
 
 General utilities.
 
@@ -352,6 +426,12 @@ Section list is a list of length-value pairs.
 > leftmost :: [(CASExpr, a)] -> CASExpr -> a
 > leftmost [] c = error "leftmost: coordinate is bigger than section list"
 > leftmost ((l,a):xs) c = if l >= c then a else leftmost xs (c-l)
+
+Leftmost section from section list & coordinate in returned section
+
+> leftmost' :: [(CASExpr, a)] -> CASExpr -> (a, CASExpr)
+> leftmost' [] c = error "leftmost': coordinate is bigger than section list"
+> leftmost' ((l,a):xs) c = if l >= c then (a, c) else leftmost' xs (c-l)
 
 Rightmost value from section list.
 
@@ -432,6 +512,43 @@ Parameters:
 >     y0 <- eval i $ Funcall CFSubst [a, sf]
 >     mapM_ (\ i -> do let y = (CASExpr.eval $
 >                               substitute (Map.fromList [("x", i)]) y0)
+>                              :: ExactNumber
+>                      --printf "%.5f\n" $ y * (meter /. micro meter)))
+>                      print $ y * CASExpr.eval (meter /. micro meter))
+>               (map (* (mm /. meter)) [0,10..100])
+
+
+The same as testCase1 but spindle is splitted in two sections.
+
+> testCase1' = withInterpreter $ \i -> do
+>     let d = 100 .* mm
+>         sj = jCircle d
+>         e = modulusOfElasticity steel /. pascal
+>         desc1 = ("s1", e, sj)
+>         desc2 = ("s2", e, sj)
+>         c = 0 .* mm
+>         b = 100 .* mm
+>         a = 800 .* mm
+>         j = 120 .* newton /. micro meter
+>         --j = 12 .* kgf /. micro meter
+>         s1 = generalSolution desc1
+>         s2 = generalSolution desc2
+>         s1f = s1  + partialSolutionRadialForce desc1 (1.*newton) c
+>         s11 = s1f + partialSolutionRadialForce desc1 (Symbol "R1") b
+>         s22 = s2  + partialSolutionRadialForce desc2 (Symbol "R2") (0.5.*a)
+>     let eqlist = (freeEnd desc1 c s1 ++
+>                   freeEnd desc2 (0.5.*(a+.b)) s22 ++
+>                   connected desc1 s11 0.5 desc2 s2 ++
+>                   radialBearing desc1 b (Symbol "R1") j s11 ++
+>                   radialBearing desc2 (0.5.*a) (Symbol "R2") j s22)
+>     r <- eval i $ solve eqlist ["s1A0", "s1A1", "s1A2", "s1A3",
+>                                 "s2A0", "s2A1", "s2A2", "s2A3",
+>                                 "R1", "R2"]
+>     print r
+>     let List [a] = r
+>     y0 <- eval i $ Funcall CFSubst [a, s1f]
+>     mapM_ (\ i -> do let y = (CASExpr.eval $
+>                               substitute (Map.fromList [("s1x", i)]) y0)
 >                              :: ExactNumber
 >                      --printf "%.5f\n" $ y * (meter /. micro meter)))
 >                      print $ y * CASExpr.eval (meter /. micro meter))
@@ -583,7 +700,12 @@ Console force of 1N and five FAG bearings.
 For the moment we use simplified geometry, to compare our results with these
 from Autodesk Inventor's Shaft Component Generator.
 
-> testCase3 =
+> testCase3 = withInterpreter $ \i -> do
+>     s <- solveSpindleDeflections i testSpindle
+>     mapM_ (\ c -> print (CASExpr.eval (getSpindleDeflection s c)))
+>           [0,100..400]
+
+> testSpindle =
 >     -- shaft
 >     ((cyl 82.6 13 <+> cyl 133 30.5 <+> cyl 75 (53+94.5) <+> cyl 125 (42.5+50)
 >          <+> cyl 60 (40+22.5) <+> cyl 57 94)

@@ -21,6 +21,7 @@
 Interface to Maxima computer algebra system.
 
 > module Maxima (
+>     Interpreter,
 >     withInterpreter,
 >     eval,
 >     debugEval -- same as eval but prints Maxima I/O
@@ -230,9 +231,9 @@ that's too dangerous!!!)
 > toLisp (Integer i)    = Lisp.Integer i
 > toLisp (Rational r)   = toLisp (Integer (numerator r)
 >                                 `Divide` Integer (denominator r))
-> toLisp a@(Symbol s)   = Lisp.Quote $
->                         if      a == cas_pi then Lisp.Symbol "$%PI"
->                         else if a == cas_e  then Lisp.Symbol "$%E"
+> toLisp (Symbol s)     = Lisp.Quote $
+>                         if      s == cas_pi then Lisp.Symbol "$%PI"
+>                         else if s == cas_e  then Lisp.Symbol "$%E"
 >                         else Lisp.Symbol $ symbolToMaxima s
 > toLisp (String s)     = Lisp.String s
 > toLisp (Plus a b)     = mfuncall "mplus" a b
@@ -254,9 +255,9 @@ Lisp.Value => CASExpr converter
 > toCAS (Lisp.Rational r)       = Rational r
 > toCAS (Lisp.Double d)         = -- Rational $ toRational d
 >     error "Double values from maxima are forbidden for precision reasons"
-> toCAS (Lisp.Symbol s)         = if      s == "$%PI" then cas_pi
->                                 else if s == "$%E"  then cas_e
->                                 else Symbol (symbolFromMaxima s)
+> toCAS (Lisp.Symbol s)         = Symbol $ if      s == "$%PI" then cas_pi
+>                                          else if s == "$%E"  then cas_e
+>                                          else symbolFromMaxima s
 > toCAS (Lisp.String s)         = String s
 > toCAS (Lisp.Quote q)          = toCAS q
 > toCAS (Lisp.AntiQuote q)      = toCAS q

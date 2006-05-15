@@ -27,6 +27,7 @@ to operate with.
 > import Data.IORef
 > import qualified Data.Map as Map
 > import ExactNumber
+> import Control.Exception
 
 Abstract CAS expression.
 The CAS expression is an abstraction layer over any maxima-like CAS system.
@@ -63,6 +64,11 @@ Thoughts:
 >              | Funcall CASFunction [CASExpr]
 >                deriving (Show)
 
+> infixr 8  `Expt`               -- same as ^
+> infixl 7  `Multiply`, `Divide` -- same as *,/
+> infixl 6  `Plus`, `Minus`      -- same as +,-
+> infix  4  `Equal`  -- same as (==)
+
 Predefined CAS functions. We use maxima protocol by default.
 All other systems must follow this protocol for compability
 
@@ -92,8 +98,8 @@ Some mathematical constants expressed as predefined symbols.
 Concrete CAS interface implementation must substitute these symbols
 with CAS-specific ones.
 
-> cas_pi = Symbol "_cas_pi"
-> cas_e  = Symbol "_cas_e"
+> cas_pi = "_cas_pi"
+> cas_e  = "_cas_e"
 
 Some utility
 
@@ -231,7 +237,7 @@ Fractional
 Floating
 
 > instance Floating CASExpr where
->     pi        = cas_pi
+>     pi        = Symbol cas_pi
 >     exp a     = Funcall CFExp [a]
 >     log a     = Funcall CFLog [a]
 >     sqrt a    = Funcall CFSqrt [a]
@@ -265,9 +271,16 @@ TODO: maybe add symbolicEq
 >     (Rational x) == (Rational y) = x == y
 >     (Integer x)  == (Rational y) = denominator y == 1 && numerator y == x
 >     (Rational x) == (Integer y)  = denominator x == 1 && numerator x == y
+>     (Symbol x)   == (Symbol y)   =
+>         if x == y then True else Symbol x == Integer 0
+>                                  -- ^ raise exception
+>                                  -- because of x can be == y after substitute
 >     x == y = ex == ey
->         where ex = eval x :: ExactNumber
->               ey = eval y :: ExactNumber
+>         where ex = me "left"  $ eval x :: ExactNumber
+>               ey = me "right" $ eval y :: ExactNumber
+>               me s = mapException (\e -> error $
+>                                    "CASExpr.(==): can't evaluate "
+>                                    ++ s ++ " hand expression: " ++ show e)
 
 > inexactEq :: CASExpr -> CASExpr -> Bool
 > inexactEq a b = inexactCompare a b == EQ
@@ -279,11 +292,17 @@ Ord
 >     compare (Rational x) (Rational y) = compare x y
 >     compare (Integer x)  (Rational y) = compare (x%1) y
 >     compare (Rational x) (Integer y)  = compare x (y%1)
+>     compare (Symbol x)   (Symbol y)   = 
+>         if x == y then EQ else compare (Symbol x) (Integer 0)
+>                               -- ^ raise exception
 >     compare x y | ex == ey  = EQ
 >                 | ex <= ey  = LT
 >                 | otherwise = GT
->         where ex = eval x :: ExactNumber
->               ey = eval y :: ExactNumber
+>         where ex = me "left"  $ eval x :: ExactNumber
+>               ey = me "right" $ eval y :: ExactNumber
+>               me s = mapException (\e -> error $
+>                                    "CASExpr.compare: can't evaluate "
+>                                    ++ s ++ " hand expression: " ++ show e)
 
 The Ord uses exact comparison, but for performance reasons its often
 enough to use inexact comparison below.

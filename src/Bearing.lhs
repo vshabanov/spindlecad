@@ -88,3 +88,18 @@ to radial one using specified conversion coefficient from axial rigidity.
 >                     attainableSpeedOil = attainableSpeedOil b,
 >                     radialRigidity = c .* axialRigidity b 
 >                   }
+
+Radial bearing with only radialRigidity defined
+
+> radialBearingJ j =
+>     RadialBearing { manufacturer = undefined,
+>                     name = undefined,
+>                     innerDiameter = undefined,
+>                     outerDiameter = undefined,
+>                     width = undefined,
+>                     dynamicLoad = undefined,
+>                     staticLoad = undefined,
+>                     attainableSpeedGrease = undefined,
+>                     attainableSpeedOil = undefined,
+>                     radialRigidity = j
+>                   }
