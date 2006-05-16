@@ -1,4 +1,22 @@
-body { color: black; background-color: white; }
+body {
+	color: black;
+	background-color: white;
+	font-family : Georgia, Times New Roman, Times, serif;
+}
+
+.header {
+	color: black;
+	background-color: white;
+	font-family : Georgia, Times New Roman, Times, serif;
+	font-size : small;
+}
+
+.footer {
+	color: black;
+	background-color: white;
+	font-family : serif;
+	font-size : small;
+}
 
 p {}
 
