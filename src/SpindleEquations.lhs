@@ -592,7 +592,7 @@ Parameters:
     Bearings axial rigidity     76.8 N/mum
 
 > testCase2 = withInterpreter $ \i -> do
->     let bearing = fagB7015C_2RSD_T_P4S_UL
+>     let bearing = fagB7015C_T_P4S_UL
 >         d = innerDiameter bearing
 >         ca = contactAngle bearing
 >         sj = jCircle d
@@ -741,5 +741,5 @@ but for deflection calculation it's OK.
 >     `addBearing` fagB7012C `at` (281.5+49)
 >     -- end
 >   where cyl = cylinder
->         fagB7015C = fagB7015C_2RSD_T_P4S_UL_asRadial
->         fagB7012C = fagB7012C_2RSD_T_P4S_UL_asRadial
+>         fagB7015C = fagB7015C_T_P4S_UL
+>         fagB7012C = fagB7012C_T_P4S_UL

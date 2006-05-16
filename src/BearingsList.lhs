@@ -28,48 +28,44 @@ List of bearings and their parameters
 
 List of all bearings defined below
 
-> bearings = [ fagB7012C_2RSD_T_P4S_UL,
->              fagB7015C_2RSD_T_P4S_UL
+> bearings = [ fagB7012C_T_P4S_UL,
+>              fagB7015C_T_P4S_UL
 >            ]
 
 FAG hi-precision spindle bearings
 
-> fagB7012C_2RSD_T_P4S_UL = AngularContactBearing -- page 40-41
+> fagB7012C_T_P4S_UL = Bearing -- page 40-41
 >     { manufacturer = "FAG",
->       name = "B7012C.2RSD.T.P4S.UL", -- sealed design, ISO P4, light series
->       -- code = "B7012C.T.P4S"
+>       code = "B7012C.T.P4S",
+>       designation = "B7012C.T.P4S.UL",
+>       -- standard bearing w/steel balls (B), medium series (70),
+>       -- sigle bearing (U), light preload (L)
+>       --name = "B7012C.2RSD.T.P4S.UL", -- sealed design (2RSD grease used)
+>       bearingType = "Standard. Steel balls.",
+>       dimensionSeries = MediumDimensionSeries,
 >       contactAngle = 15 * degree,
 >       innerDiameter = 60 .* mm,
 >       outerDiameter = 95 .* mm,
 >       width = 18 .* mm,
->       dynamicLoad = 39 .* kN,
->       staticLoad = 33.5 .* kN,
 >       attainableSpeedGrease = 14000 .* rpm,
 >       attainableSpeedOil = 22000 .* rpm,
->       preloadingForce = 211 .* newton,
->       unloadingForce = 658 .* newton,
+>       radialRigidity = (64.5/2*6) .* newton /. micro meter,
 >       axialRigidity = (64.5/2) .* newton /. micro meter
 >                         -- ^ half because of Sa given for bearing pair
 >     }
 
-> fagB7015C_2RSD_T_P4S_UL = AngularContactBearing -- page 46-47
+> fagB7015C_T_P4S_UL = Bearing -- page 46-47
 >     { manufacturer = "FAG",
->       name = "B7015C.2RSD.T.P4S.UL", -- sealed design, ISO P4, light series
->       -- code = "B7015C.T.P4S"
+>       code = "B7015C.T.P4S",
+>       designation = "B7015C.T.P4S.UL",
+>       bearingType = "Standard. Steel balls.",
+>       dimensionSeries = MediumDimensionSeries,
 >       contactAngle = 15 * degree,
 >       innerDiameter = 75 .* mm,
 >       outerDiameter = 115 .* mm,
 >       width = 20 .* mm,
->       dynamicLoad = 51 .* kN,
->       staticLoad = 46.5 .* kN,
 >       attainableSpeedGrease = 12000 .* rpm,
 >       attainableSpeedOil = 19000 .* rpm,
->       preloadingForce = 283 .* newton,
->       unloadingForce = 880 .* newton,
+>       radialRigidity = (76.8/2*6) .* newton /. micro meter,
 >       axialRigidity = (76.8/2) .* newton /. micro meter
 >     }
-
-> fagB7012C_2RSD_T_P4S_UL_asRadial =
->     radialBearingFromAngular 6 fagB7012C_2RSD_T_P4S_UL
-> fagB7015C_2RSD_T_P4S_UL_asRadial =
->     radialBearingFromAngular 6 fagB7015C_2RSD_T_P4S_UL

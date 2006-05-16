@@ -25,6 +25,7 @@ Bearing description data type
 > import TypeLevelPhysicalDimension
 > import TypeLevelPhysicalValue
 > import TypeLevelPhysicalUnitsList
+> import CASExpr
 
 Bearing data type.
 
@@ -42,64 +43,48 @@ The bearing type is compound
 Any of this components may be absent, but algoritms which don't need them
 must still work.
 
+For the moment we have simple all-in-one type.
 
-> data Bearing = AngularContactBearing
+> data Bearing = Bearing
 >                { manufacturer :: String,
->                  name :: String,
+>                  code :: String,
+>                  designation :: String,
+>                  bearingType :: String,
+>                  dimensionSeries :: DimensionSeries,
 >                  contactAngle :: NondimensionalValue,
 >                  innerDiameter :: Value Meter, -- d
 >                  outerDiameter :: Value Meter, -- D
 >                  width :: Value Meter, -- B
->                  dynamicLoad :: Value Newton, -- Cdyn
->                  staticLoad :: Value Newton,  -- C0stat
 >                  attainableSpeedGrease :: Value Hertz,
 >                  attainableSpeedOil :: Value Hertz,
->                  preloadingForce :: Value Newton, -- Fv
->                  unloadingForce :: Value Newton,  -- KaE
+>                  radialRigidity :: Value NewtonDivMeter,
 >                  axialRigidity :: Value NewtonDivMeter -- Sa
->                }
->              | RadialBearing
->                { manufacturer :: String,
->                  name :: String,
->                  innerDiameter :: Value Meter, -- d
->                  outerDiameter :: Value Meter, -- D
->                  width :: Value Meter, -- B
->                  dynamicLoad :: Value Newton, -- Cdyn
->                  staticLoad :: Value Newton,  -- C0stat
->                  attainableSpeedGrease :: Value Hertz,
->                  attainableSpeedOil :: Value Hertz,
->                  radialRigidity :: Value NewtonDivMeter
 >                }
 >     deriving (Eq, Ord, Show)
 
+Bearing dimension series.
 
-Bad but at the moment useful util, which converts angular bearing
-to radial one using specified conversion coefficient from axial rigidity.
+> data DimensionSeries = UltraLightweightDimensionSeries
+>                      | LightweightDimensionSeries
+>                      | MediumDimensionSeries
+>                      | HeavyDimensionSeries
+>     deriving (Eq, Ord, Show)
 
-> radialBearingFromAngular c b =
->     RadialBearing { manufacturer = manufacturer b,
->                     name = name b,
->                     innerDiameter = innerDiameter b,
->                     outerDiameter = outerDiameter b,
->                     width = width b,
->                     dynamicLoad = dynamicLoad b,
->                     staticLoad = staticLoad b,
->                     attainableSpeedGrease = attainableSpeedGrease b,
->                     attainableSpeedOil = attainableSpeedOil b,
->                     radialRigidity = c .* axialRigidity b 
->                   }
-
-Radial bearing with only radialRigidity defined
 
 > radialBearingJ j =
->     RadialBearing { manufacturer = undefined,
->                     name = undefined,
->                     innerDiameter = undefined,
->                     outerDiameter = undefined,
->                     width = undefined,
->                     dynamicLoad = undefined,
->                     staticLoad = undefined,
->                     attainableSpeedGrease = undefined,
->                     attainableSpeedOil = undefined,
->                     radialRigidity = j
->                   }
+>     Bearing { manufacturer = undefined,
+>               code = "Radial bearing",
+>               designation = "Radial bearing, j = "
+>                             ++ show (eval $ j /. (newton/.micro meter))
+>                             ++ "N/mum",
+>               bearingType = "Radial bearing",
+>               dimensionSeries = undefined,
+>               contactAngle = undefined,
+>               innerDiameter = undefined,
+>               outerDiameter = undefined,
+>               width = undefined,
+>               attainableSpeedGrease = undefined,
+>               attainableSpeedOil = undefined,
+>               radialRigidity = j,
+>               axialRigidity = undefined
+>             }
