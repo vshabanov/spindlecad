@@ -31,7 +31,7 @@ system of equations that describes particular spindle.
 > import Material
 > import MaterialsList
 > import Bearing
-> import BearingsList hiding (bearings)
+> import Bearings.FAG.SpindleBearings hiding (bearings)
 > import Maxima
 > import TypeLevelPhysicalDimension
 > import TypeLevelPhysicalValue

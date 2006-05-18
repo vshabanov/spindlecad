@@ -20,7 +20,7 @@
 
 List of bearings and their parameters
 
-> module BearingsList where
+> module Bearings.FAG.SpindleBearings where
 
 > import Bearing
 > import TypeLevelPhysicalValue
