@@ -33,11 +33,17 @@ modules.
 >     let l = stripComments $ lines c
 >         leftPage = filter (\ (x:_) -> isAlpha x) l
 >         rightPage = filter (\ (x:_) -> isDigit x) l
+>         withDlrs = \ s -> let w = words s in
+>                             if length w == 30 then
+>                                s -- DLR dimensions exists
+>                             else
+>                                unwords $ take 10 w ++ ["0","0","0"] ++ drop 10 w
+>                                -- insert zero DLR dimenstions
 >         concatenated = map
 >             (\ (l,r) -> if head (words l) /= last (words r) then
 >                           error ("Can't match " ++ head (words l))
 >                         else
->                           "\"" ++ l ++ " " ++ escaped r ++ "\"")
+>                           "\"" ++ withDlrs (l ++ " " ++ escaped r) ++ "\"")
 >             $ zip leftPage rightPage
 >     bracket (openFile "SpindleBearingsCatalogue.lhs" WriteMode) hClose $ \ o -> do
 >     mapM_ (hPutStrLn o) copyrightNotice
@@ -45,12 +51,12 @@ modules.
 >     hPutStrLn o "This file is generated from SpindleBearingsCatalogue.txt."
 >     hPutStrLn o "Use CataloguePreparation.prepare to update."
 >     hPutStrLn o ""
->     hPutStrLn o "> module SpindleBearingsCatalogue where"
+>     hPutStrLn o "> module Bearings.FAG.SpindleBearingsCatalogue where"
 >     hPutStrLn o ""
 >     hPutStrLn o "> list ="
 >     hPutStr   o ">     ["
->     hPutStrLn o $ stringConcat ",\n>      " concatenated
->     hPutStrLn o ">     ]"
+>     mapM_ (hPutStr o) $ interleave ",\n>      " concatenated
+>     hPutStrLn o "\n>     ]"
 
 > stripComments = filter (\ x -> case x of
 >                                    []    -> False
@@ -61,9 +67,9 @@ modules.
 > escaped (x:xs) | isAscii x = x : escaped xs
 >                | otherwise = showLitChar x (escaped xs)
 
-> stringConcat p [] = []
-> stringConcat p [a] = a
-> stringConcat p (x:xs) = x ++ p ++ stringConcat p xs
+> interleave p [] = []
+> interleave p [a] = [a]
+> interleave p (x:xs) = x : p : interleave p xs
 
 > copyrightNotice =
 >     ["--",

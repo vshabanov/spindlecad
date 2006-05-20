@@ -31,7 +31,7 @@ system of equations that describes particular spindle.
 > import Material
 > import MaterialsList
 > import Bearing
-> import Bearings.FAG.SpindleBearings hiding (bearings)
+> import Bearings.FAG.SpindleBearings
 > import Maxima
 > import TypeLevelPhysicalDimension
 > import TypeLevelPhysicalValue
@@ -592,7 +592,7 @@ Parameters:
     Bearings axial rigidity     76.8 N/mum
 
 > testCase2 = withInterpreter $ \i -> do
->     let bearing = fagB7015C_T_P4S_UL
+>     let bearing = findBearingByCode "B7015C.T.P4S"
 >         d = innerDiameter bearing
 >         ca = contactAngle bearing
 >         sj = jCircle d
@@ -726,6 +726,7 @@ but for deflection calculation it's OK.
 
 > testSpindle =
 >     -- shaft
+>     --makeRigid
 >     ((cyl 82 13 <+> cyl 133 23 <+> cyl 120 8 <+> cyl 75 147.5
 >       <+> cyl 67 90 <+> cyl 60 62.5 <+> cyl 57 96)
 >      `cut`
@@ -741,5 +742,9 @@ but for deflection calculation it's OK.
 >     `addBearing` fagB7012C `at` (281.5+49)
 >     -- end
 >   where cyl = cylinder
->         fagB7015C = fagB7015C_T_P4S_UL
->         fagB7012C = fagB7012C_T_P4S_UL
+>         fagB7015C = findBearingByCode "B7015C.T.P4S"
+>         fagB7012C = findBearingByCode "B7012C.T.P4S"
+>         makeRigid = map (\ s -> s { material = rigidMaterial })
+>         rigidMaterial = IsotropicMaterial
+>                         { modulusOfElasticity = (210000 * 10^6) .* mega pascal }
+
