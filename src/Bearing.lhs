@@ -58,7 +58,9 @@ For the moment we have simple all-in-one type.
 >                  attainableSpeedGrease :: Value Hertz,
 >                  attainableSpeedOil :: Value Hertz,
 >                  radialRigidity :: Value NewtonDivMeter,
->                  axialRigidity :: Value NewtonDivMeter -- Sa
+>                  axialRigidity :: Value NewtonDivMeter, -- Sa
+>                  cdyn :: Value Newton,  -- Cdyn   - dynamic load rating
+>                  c0stat :: Value Newton -- C0stat - static load rating
 >                }
 >     deriving (Eq, Ord, Show)
 
@@ -86,5 +88,7 @@ Bearing dimension series.
 >               attainableSpeedGrease = undefined,
 >               attainableSpeedOil = undefined,
 >               radialRigidity = j,
->               axialRigidity = undefined
+>               axialRigidity = undefined,
+>               cdyn = undefined,
+>               c0stat = undefined
 >             }

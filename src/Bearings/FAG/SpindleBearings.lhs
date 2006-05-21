@@ -129,7 +129,9 @@ Bearing description string parsing routines.
 >                   attainableSpeedGrease = speedGrease,
 >                   attainableSpeedOil = speedOil,
 >                   radialRigidity = (if cangl == 15*degree then 6/2 else 2/2) .* sal,
->                   axialRigidity = (1/2) .* sal
+>                   axialRigidity = (1/2) .* sal,
+>                   cdyn = cdyn,
+>                   c0stat = c0stat
 >                 }
 
 > num :: Value a -> Parser (Value a)
