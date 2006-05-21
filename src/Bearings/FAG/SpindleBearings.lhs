@@ -22,7 +22,8 @@ List of FAG hi-precision spindle bearings and their parameters
 
 > module Bearings.FAG.SpindleBearings (
 >     bearingsList,
->     findBearingByCode
+>     findBearingByCode,
+>     spindleBearingType
 >   ) where
 
 > import Bearing
@@ -127,7 +128,7 @@ Bearing description string parsing routines.
 >                   width = bwidth,
 >                   attainableSpeedGrease = speedGrease,
 >                   attainableSpeedOil = speedOil,
->                   radialRigidity = (6/2) .* sal,
+>                   radialRigidity = (if cangl == 15*degree then 6/2 else 2/2) .* sal,
 >                   axialRigidity = (1/2) .* sal
 >                 }
 

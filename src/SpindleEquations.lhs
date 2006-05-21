@@ -122,6 +122,18 @@ which is cut from base spindle.
 >               base { momentOfInertia =
 >                      momentOfInertia base -. momentOfInertia bore }
 
+Makes spindle shaft rigidity millon times greater than those steel,
+i.e. makes shaft practically absolutely rigid.
+TODO: This function was initially indroduced to determine what part of
+deflection is shaft deflection and what is bearings deflection.
+But this is incorrect method for multibearing (and for two bearing?) shaft.
+I think that something like least squares method on bearing deflections
+can give more precice bearing deflection than absolutely rigid shaft.
+
+> makeShaftRigid = map (\ s -> s { material = rigidMaterial })
+>     where rigidMaterial = steel { modulusOfElasticity =
+>                                   (10^6) .* modulusOfElasticity steel }
+
 Fixities for construction functions and operators
 
 > infixl 9 `at`                 -- maximal fixity
@@ -158,8 +170,8 @@ where a = sectionUnion 1 (fst (splitSection 1' (length 1)))
 >               -> Spindle -> Spindle -> Spindle
 > unionSpindles sectionUnion sp1 sp2 = u sp1 sp2
 >     where u [] [] = []
->           u [] a  = error "unionSpindles: spinle1 is shorted than spindle2"
->           u a  [] = error "unionSpindles: spinle2 is shorted than spindle1"
+>           u [] a  = error "unionSpindles: spinle1 is shorter than spindle2"
+>           u a  [] = error "unionSpindles: spinle2 is shorter than spindle1"
 >           u (s1:xs1) (s2:xs2) =
 >               if sectionLength s1 == sectionLength s2 then
 >                  sectionUnion s1 s2 : u xs1 xs2
@@ -572,179 +584,3 @@ The same as testCase1 but spindle is splitted in two sections.
 >                      --printf "%.5f\n" $ y * (meter /. micro meter)))
 >                      print $ y * CASExpr.eval (meter /. micro meter))
 >               (map (* (mm /. meter)) [0,10..100])
-
-
-Test case #2. FAILED. Incorrect equations used. Don't see below.
-Spindle with 1N force in the middle of bay part
-and two axial FAG B7015C.T.P4S bearings.
-
-Scheme:
-            | 1N
-            |
-       o\   V    /o
-    ----------------
-       o/        \o
-
-Parameters:
-    Shaft diameter              75 mm
-    Console length              100 mm
-    Bay lengh                   800 mm
-    Bearings axial rigidity     76.8 N/mum
-
-> testCase2 = withInterpreter $ \i -> do
->     let bearing = findBearingByCode "B7015C.T.P4S"
->         d = innerDiameter bearing
->         ca = contactAngle bearing
->         sj = jCircle d
->         s = areaOfCircle d
->         e = modulusOfElasticity steel
->         desc = ("", e, sj)
->         c = 500 .* mm
->         b = 100 .* mm
->         a = 800 .* mm
->         ja = axialRigidity bearing
->         j = 6 .* ja -- radial regidity calculated using FAG recommendations
->         y = generalSolution desc
->         y1  = y   + partialSolutionRadialForce desc (Symbol "R1") b
->         y1f = y1  + partialSolutionRadialForce desc (1.*newton) c
->         y2  = y1f + partialSolutionRadialForce desc (Symbol "R2") (a+.b)
->     -- to check ourselfes we first solve this spindle
->     -- as one with two radial bearings
->     let eqlistAsRadial = (freeEnd desc (0.*mm) y ++
->                           freeEnd desc (a+.b) y2 ++
->                           radialBearing desc b (Symbol "R1") j y1 ++
->                           radialBearing desc (a+.b) (Symbol "R2") j y2)
->     asRadial <- eval i $ solve eqlistAsRadial ["A0", "A1", "A2", "A3",
->                                                "R1", "R2"]
->     printSolvedExpr i     "y_0  = " asRadial [("x",0)] y
->     y' <- eval i $ diff y "x"
->     printSolvedExpr i     "y'_0 = " asRadial [("x",0)] y'
->     printSolvedExpr i     "y_R1 = " asRadial [("x",0.1)] y1
->     printSolvedExpr i     "y_R2 = " asRadial [("x",0.9)] y2
->     printSolvedVariable i "R1   = " asRadial "R1"
->     printSolvedVariable i "R2   = " asRadial "R2"
->     --printValues i asRadial y   "x" [0,10..100]
->     --printValues i asRadial y1  "x" [100,200..500]
->     --printValues i asRadial y1f "x" [500,600..900]
->     --printValues i asRadial y2  "x" [900,1000]
->     let x = Symbol "x"
->         r = Symbol "R" -- axial reaction
->         zr  = Symbol "C" + x
->         zr1 = Symbol "C" + x - (x - pv b meter)*r/(pv e pascal*(pv s meter2))
->         zr2 = Symbol "C" + x - (pv a meter)*r/(pv e pascal*(pv s meter2))
->         n = 10            -- n balls in bearing (one side only)
->         ji = (1/n) .* ja  -- rigidity of one ball
->         angles = map (pi/(n-1)*) [0..n-1]
->         r1i = map (ballReactions ca d b zr y ji) angles
->         r2i = map (ballReactions (-ca) d (b+.a) zr1 y1f ji) angles
->         ra1 = foldl (+) 0 $ map fst r1i
->         ra2 = foldl (+) 0 $ map fst r2i
->         rr1 = foldl (+) 0 $ map snd r1i
->         rr2 = foldl (+) 0 $ map snd r2i
->     let eqlistAngular = (freeEnd desc (0.*mm) y ++
->                          freeEnd desc (a+.b) y2 ++
->                          [ra1 `Equal` r] ++
->                          [ra2 `Equal` (-r)] ++
->                          [rr1 `Equal` Symbol "R1"] ++
->                          [rr2 `Equal` Symbol "R2"] ++
->                          [subst [("x", pv c meter)] zr1 `Equal` pv c meter])
->     --asAngular <- eval i $ solve eqlistAngular ["A0", "A1", "A2", "A3",
->     --                                            "R", "C", "R1", "R2"]
->     --print asAngular -- ^^ this system is not solved
->     ---------------
->     let br = map (ballReactions ca d b
->                   (Symbol "Z0" + x) (Symbol "A0" + Symbol "A1" * x) ji) angles
->         bra = foldl (+) 0 $ map fst br
->         brr = foldl (+) 0 $ map snd br
->         eqlist = [bra `Equal` 1, -- 1N axial force
->                   brr `Equal` 0] -- no radial force
->     --solution <- eval i $ solve eqlist ["A0", "A1", "Z0"]
->     --print solution -- it solves only for two bearings (n=2)
->                    -- maybe doesn't sum reactions, but only integrate?
->     -- we use y0 and y'0 from previous calculations, z0 was searched manually
->     -- so brr~=0.5 and this z is much (46 times) greater than it should be
->     -- after axial deformation by bra.
->     printSolvedExpr i "bra = " (List [List []])
->                         [("Z0",0.000000046), ("A0", -1.085e-9), ("A1", -1.22e-7)] bra
->     printSolvedExpr i "brr = " (List [List []])
->                         [("Z0",0.000000046), ("A0", -1.085e-9), ("A1", -1.22e-7)] brr
->     print $ CASExpr.eval $ (pv a meter)*1.17/(pv e pascal*(pv s meter2))
-
-> ballReactions alpha d b zr y ji beta = (rai, rri)
->     where xi = pv d meter / 2 * cos beta
->           yi = pv d meter / 2 * sin beta
->           substb = subst [("x", pv b meter)]
->           phi = substb (diff y "x")
->           yiabs = yi * cos phi + substb y
->           ziabs = yi * sin phi + substb zr
->           r = sqrt $ xi**2 + yiabs**2
->           z0 = pv b meter + pv d meter/(2*tan alpha)
->           zc = z0 - r/tan alpha
->           rai = (ziabs - zc) * pv ji (newton /. meter)
->           rri = (rai / tan alpha) * sin beta
-
-
-> substSolution i solution pvlist expr = do
->     let List [a] = solution
->     f <- eval i $ Funcall CFSubst [substitute (Map.fromList pvlist) a,
->                                    substitute (Map.fromList pvlist) expr]
->     return $ f
-
-> printSolvedExpr i prefix solution pvlist expr = do
->     v <- substSolution i solution pvlist expr
->     putStrLn (prefix ++ show (CASExpr.eval v {-:: ExactNumber -}))
-
-> printSolvedVariable i prefix solution symbol = do
->     v <- substSolution i solution [] (Symbol symbol)
->     putStrLn (prefix ++ show (CASExpr.eval v :: ExactNumber))
-
-printValues prints `function` results (in mum) for `parameter`
-in `list` of values (in mm). `solution` is used to substitute all
-other parameters
-
-> printValues i solution function parameter list = do
->     f <- substSolution i solution [] function
->     mapM_ (\ i -> do let y = (CASExpr.eval $ substitute
->                               (Map.fromList [(parameter, i)]) $
->                               f * (meter /. micro meter)) :: ExactNumber
->                      putStrLn (show (truncate $ CASExpr.eval $
->                                      i .* meter /. mm)
->                                ++ "\t" ++ show y))
->               (map (* (mm /. meter)) list)
-
-
-Test case #3.
-The spindle of machine tool used in course work.
-Console force of 1N and five FAG bearings.
-Geometry is simplified against real spindle (many groves are removed),
-but for deflection calculation it's OK.
-
-> testCase3 = withInterpreter $ \i -> do
->     s <- solveSpindleDeflections i testSpindle
->     mapM_ (\ c -> print (CASExpr.eval (getSpindleDeflection s c)))
->           [0,100..400]
-
-> testSpindle =
->     -- shaft
->     --makeRigid
->     ((cyl 82 13 <+> cyl 133 23 <+> cyl 120 8 <+> cyl 75 147.5
->       <+> cyl 67 90 <+> cyl 60 62.5 <+> cyl 57 96)
->      `cut`
->      (cyl 55 30 <+> cyl 45 73 <+> cyl 35 337))
->     -- forces
->     `addRadialForce` 1 `at` 0
->     -- front bearing set
->     `addBearing` fagB7015C `at` (44+27)
->     `addBearing` fagB7015C `at` (44+47)
->     `addBearing` fagB7015C `at` (44+79)
->     -- rear bearing set
->     `addBearing` fagB7012C `at` (281.5+31)
->     `addBearing` fagB7012C `at` (281.5+49)
->     -- end
->   where cyl = cylinder
->         fagB7015C = findBearingByCode "B7015C.T.P4S"
->         fagB7012C = findBearingByCode "B7012C.T.P4S"
->         makeRigid = map (\ s -> s { material = rigidMaterial })
->         rigidMaterial = IsotropicMaterial
->                         { modulusOfElasticity = (210000 * 10^6) .* mega pascal }
-
