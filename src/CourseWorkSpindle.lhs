@@ -32,6 +32,7 @@ This module is temporary. Its used for manual course work spindle optimization.
 > import Bearing
 > import Bearings.FAG.SpindleBearings
 > import SpindleEquations
+> import Text.Printf
 
 The spindle of machine tool used in course work.
 Console force of 1N and five FAG bearings.
@@ -48,16 +49,27 @@ but for deflection calculation it's OK.
 
 > for fun pred l f = mapM_ f (filter (fun `is` pred) l)
 
+> main = testCase
 
 > testCase = withInterpreter $ \i -> do
+>     baseS <- solveSpindleDeflections i testSpindle
+>     let baseLife = minimum $ map (\ (b, p, n) -> abs $ eval $ cdyn b /. n)
+>                    (getBearingReactions baseS)
 >     for innerDiameter (== 75.*mm) std15 $ \ b1 -> do
 >       for innerDiameter (== 60.*mm) std15 $ \ b2 -> do
 >         --let b2 = findBearingByCode "B7012C.T.P4S"
 >         s <- solveSpindleDeflections i (testSpindleConstructor b1 b2)
 >         -- 32sec/16schemes = 2 sec per solveSpindleDeflections
+>         -- 18sec/16schemes  when ghc -O
 >         tabbed 16 (code b1)
 >         tabbed 16 (code b2)
->         print (eval (getSpindleDeflection s 0))
+>         tabbed 10 (take 10 $ show $ eval (getSpindleDeflection s (0.*mm) /. nano meter))
+>         mapM_ (\ (b, p, n) -> --tabbed 6 (take 6 $ show $
+>                               printf "%5.2f | " (((abs $ (eval $ cdyn b/.n :: Double)) / baseLife)**3))
+>                   (getBearingReactions s)
+>         putStrLn ""
+
+> 
 
 > is f predicate = predicate . f
 
@@ -83,16 +95,16 @@ but for deflection calculation it's OK.
 >      `cut`
 >      (cyl 55 30 <+> cyl 45 73 <+> cyl 35 (337+3*wd1+2*wd2)))
 >     -- forces
->     `addRadialForce` 1 `at` 0
+>     `addRadialForce` 1.*newton `at` 0.*mm
 >     -- front bearing set
->     `addBearing` b1 `at` (44+27+0.5*wd1)
->     `addBearing` b1 `at` (44+47+1.5*wd1)
->     `addBearing` b1 `at` (44+79+2.5*wd1)
+>     `addBearing` b1 `at` (44+27+0.5*wd1).*mm
+>     `addBearing` b1 `at` (44+47+1.5*wd1).*mm
+>     `addBearing` b1 `at` (44+79+2.5*wd1).*mm
 >     -- rear bearing set
->     `addBearing` b2 `at` (281.5+31+3*wd1+0.5*wd2)
->     `addBearing` b2 `at` (281.5+49+3*wd1+1.5*wd2)
+>     `addBearing` b2 `at` (281.5+31+3*wd1+0.5*wd2).*mm
+>     `addBearing` b2 `at` (281.5+49+3*wd1+1.5*wd2).*mm
 >     -- end
->   where cyl = cylinder
+>   where cyl d l = cylinder (d.*mm) (l.*mm)
 >         wd1 = (width b1 -. width fagB7015C) /. mm
 >         wd2 = (width b2 -. width fagB7012C) /. mm
 >         fagB7015C = findBearingByCode "B7015C.T.P4S"

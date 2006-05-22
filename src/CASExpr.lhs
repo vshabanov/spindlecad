@@ -241,7 +241,11 @@ Floating
 >     exp a     = Funcall CFExp [a]
 >     log a     = Funcall CFLog [a]
 >     sqrt a    = Funcall CFSqrt [a]
+>                 
+>     (Integer a) ** (Integer b) = Integer (a^b)
+>     (Rational a) ** (Integer b) = Rational (a^b)
 >     a ** b    = Expt a b
+>      
 >     -- logBase x y  = log y / log x
 >     sin a     = Funcall CFSin [a]
 >     cos a     = Funcall CFCos [a]

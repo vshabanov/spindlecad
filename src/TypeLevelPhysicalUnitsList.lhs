@@ -35,7 +35,8 @@ from http://www.electro-optical.com/unitconv/unitdict/units_cat.htm
 
 Squares
 
-> square a = a *. a
+> square :: (DimensionMultiply d d d2) => Value d -> Value d2
+> square (Value a) = Value (a**2)
 
 > type Meter2 = Dimension (Succ One) Zero Zero Zero Zero Zero Zero
 > meter2    = square meter
@@ -48,7 +49,9 @@ Squares
 
 Cubes
 
-> cube a = a *. a *. a
+> cube :: (DimensionMultiply d d d2, DimensionMultiply d d2 d3)
+>         => Value d -> Value d3
+> cube (Value a) = Value (a**3)
 
 > type Meter3 = Dimension (Succ (Succ One)) Zero Zero Zero Zero Zero Zero
 > meter3    = cube meter
@@ -61,14 +64,18 @@ Cubes
 
 Fourths
 
+> fourth :: (DimensionMultiply d d d2, DimensionMultiply d2 d2 d4)
+>           => Value d -> Value d4
+> fourth (Value a) = Value (a**4)
+
 > type Meter4 = Dimension (Succ (Succ (Succ One))) Zero Zero Zero Zero Zero Zero
-> meter4    = square meter2
-> kilogram4 = square kilogram2
-> second4   = square second2
-> ampere4   = square ampere2  
-> kelvin4   = square kelvin2
-> mole4     = square mole2
-> candela4  = square candela2
+> meter4    = fourth meter
+> kilogram4 = fourth kilogram
+> second4   = fourth second
+> ampere4   = fourth ampere  
+> kelvin4   = fourth kelvin
+> mole4     = fourth mole
+> candela4  = fourth candela
 
 Time.
 

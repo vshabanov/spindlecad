@@ -59,15 +59,14 @@ Spindle description data type.
 
 
 Spindle construction functions.
-All dimensions in millimeters, forces in newtons, moments in newton*meter.
 Steel is default material.
 
 Cylindrical section description.
 
-> cylinder :: CASExpr -> CASExpr -> Spindle
-> cylinder d l = [Section { momentOfInertia = jCircle (d.*mm) .* meter4,
+> cylinder :: Value Meter -> Value Meter -> Spindle
+> cylinder d l = [Section { momentOfInertia = jCircle d,
 >                           material = steel,
->                           sectionLength = l.*mm,
+>                           sectionLength = l,
 >                           forces = Map.empty,
 >                           bearings = Map.empty 
 >                         }]
@@ -89,15 +88,15 @@ Therefore `cone` is now commented.
 
 Something `at` specified coordinate description.
 
-> at :: a -> CASExpr -> (a, Value Meter)
-> at a b = (a, b.*mm)
+> at :: a -> Value Meter -> (a, Value Meter)
+> at a b = (a, b)
 
 Radial force description.
 
-> addRadialForce :: Spindle -> (CASExpr, Value Meter) -> Spindle
+> addRadialForce :: Spindle -> (Value Newton, Value Meter) -> Spindle
 > addRadialForce sp (force, c) = modifySectionAt addrf sp c
 >     where addrf s c = s { forces = Map.insert c
->                           (Force { radialForce = force .* newton,
+>                           (Force { radialForce = force,
 >                                    bendingMoment = 0 .* newton *. meter })
 >                           (forces s) }
 
@@ -136,11 +135,12 @@ can give more precice bearing deflection than absolutely rigid shaft.
 
 Fixities for construction functions and operators
 
-> infixl 9 `at`                 -- maximal fixity
-> infixl 8 `addRadialForce`     -- same fixity as ^, but left associative
-> infixl 8 `addBearing`         -- same fixity as ^, but left associative
-> infixl 6 `cut`                -- same fixity as -
-> infixr 5 <+>                  -- same fixity as ++
+> infixl 6 `at`                 -- same fixity as +
+> infixr 6 <+>                  -- same fixity as +
+> infixl 5 `addRadialForce`     -- same fixity as ++, but left associative
+> infixl 5 `addBearing`         -- same fixity as ++, but left associative
+> infixl 5 `cut`                -- same fixity as ++
+
 
 Spindle construction functions utilities.
 
@@ -255,12 +255,22 @@ General solution
     y = ---------------------------
                    E*J
 
-> generalSolution desc =
->     divEJ desc $ s "A0" + s "A1" * x + s "A2" * x**2 + s "A3" * x**3
->     where s = symbol desc
->           x = s "x"
+> type Desc = (String,          -- prefix
+>              Value Pascal,    -- E
+>              Value Meter4)    -- J
 
-> divEJ  (prefix, e, j) = (/ (pv e pascal * pv j meter4))
+> generalSolution :: Desc -> Value Meter
+> generalSolution desc =
+>     divEJ desc $ (a0 +. a1.*x +. a2*.square x +. a3*.cube x)
+>               *. (newton *. meter2) -- E*J dimension
+>     where s = symbol desc
+>           x = s "x" .* meter
+>           a0 = s "A0" .* meter
+>           a1 = s "A1"
+>           a2 = s "A2" ./ meter
+>           a3 = s "A3" ./ meter2
+
+> divEJ  (prefix, e, j) = (/. (e *. j))
 > symbol (prefix, e, j) a = Symbol (prefix ++ a)
 > prefix (p, _, _) = p
 
@@ -274,20 +284,24 @@ Radial force
     ------------
         E*J
 
+> partialSolutionRadialForce :: Desc -> Value Newton -> Value Meter
+>                            -> Value Meter
 > partialSolutionRadialForce desc force coordinate =
->     divEJ desc $ -pv force newton/6 * (x-pv coordinate meter)**3
+>     divEJ desc $ (-1/6) .* force *. cube (x -. coordinate)
 >     where s = symbol desc
->           x = s "x"
+>           x = s "x" .* meter
 
 Bending moment
     -M/2*(x-a)^2
     ------------
         E*J
 
+> partialSolutionBendingMoment :: Desc -> Value NewtonMulMeter -> Value Meter
+>                                 -> Value Meter
 > partialSolutionBendingMoment desc moment coordinate =
->     divEJ desc $ -pv moment (newton *. meter)/2 * (x-pv coordinate meter)**2
+>     divEJ desc $ (-1/2) .* moment *. square (x -. coordinate)
 >     where s = symbol desc
->           x = s "x"
+>           x = s "x" .* meter
 
 
 Boundary conditions.
@@ -295,9 +309,10 @@ Boundary conditions.
 Free end.
     y'' = 0, y''' = 0
 
+> freeEnd :: Desc -> Value Meter -> Value Meter -> [CASExpr]
 > freeEnd desc coordinate rhs =
->     [subst [(x, pv coordinate meter)] (diffn rhs x 2) `Equal` 0,
->      subst [(x, pv coordinate meter)] (diffn rhs x 3) `Equal` 0]
+>     [subst [(x, coordinate /. meter)] (diffn (rhs/.meter) x 2) `Equal` 0,
+>      subst [(x, coordinate /. meter)] (diffn (rhs/.meter) x 3) `Equal` 0]
 >     where x = prefix desc ++ "x"
 
 Connected sections.
@@ -306,21 +321,26 @@ Connected sections.
     y1''(l)*E1*J1 = y2''(0)*E2*J2       - moments equality
     y1'''(l)*E1*J1 = y2'''(0)*E2*J2     - forces equality
 
+> connected :: Desc -> Value Meter -> Value Meter -> Desc -> Value Meter
+>           -> [CASExpr]
 > connected (prefix1,e1,j1) y1 l (prefix2,e2,j2) y2 =
->     [y1 `eq` y2,
->      diff y1 x1 `eq` diff y2 x2,
->      diffn (y1*e1*j1) x1 2 `eq` diffn (y2*e2*j2) x2 2,
->      diffn (y1*e1*j1) x1 3 `eq` diffn (y2*e2*j2) x2 3]
->     where eq a b = subst [(x1, l)] a `Equal` subst [(x2, 0)] b
+>     [(y1/.meter) `eq` (y2/.meter),
+>      diff (y1/.meter) x1 `eq` diff (y2/.meter) x2,
+>      diffn' (y1*.e1*.j1) x1 2 `eq` diffn' (y2*.e2*.j2) x2 2,
+>      diffn' (y1*.e1*.j1) x1 3 `eq` diffn' (y2*.e2*.j2) x2 3]
+>     where eq a b = subst [(x1, l/.meter)] a `Equal` subst [(x2, 0)] b
 >           x1 = prefix1 ++ "x"
 >           x2 = prefix2 ++ "x"
+>           diffn' a = diffn (a/.(newton*.meter3))
 
 Radial bearing
     y = R/j
 
+> radialBearing :: Desc -> Value Meter -> Value Newton -> Value NewtonDivMeter
+>                  -> Value Meter -> [CASExpr]
 > radialBearing desc coordinate r j rhs =
->     [(pv r newton / pv j (newton /. meter))
->      `Equal` subst [(x, pv coordinate meter)] rhs]
+>     [(r /. j) /. meter
+>      `Equal` subst [(x, coordinate /. meter)] (rhs/.meter)]
 >     where x = prefix desc ++ "x"
 
 
@@ -331,61 +351,75 @@ Deflection function is changed after each force or bearing applied.
 Prefix is added to all variabled used to describe beam or bearing reaction,
 i.e. A0...A3 become (prefix++A0...) and all reactions become prefixR1,2,...
 
-> type SectionDeflections = (String, [(CASExpr, CASExpr)])
+> type SectionDeflections = (String,          -- section prefix
+>                            [(Value Meter,   -- sub-section length
+>                              Value Meter)]) -- deflection function
 
 > sectionDeflections :: String -> Section -> SectionDeflections
 > sectionDeflections prefix section =
 >     (prefix,
 >      sd (generalSolution desc)
 >         1 -- start bearing number to use in prefixR1,2,...
->         0 -- start coordinate
+>         (0.*meter) -- start coordinate
 >         (toList $ forces section) (toList $ bearings section))
 >     where desc = (prefix,
->                   modulusOfElasticity (material section) /. pascal, -- E
->                   substitute (Map.fromList [("x", Symbol (prefix++"x"))]) $
->                       momentOfInertia section /. meter4) -- J
->           toList = map (\(c, a) -> (c /. meter, a)) . Map.toList
+>                   modulusOfElasticity (material section), -- E
+>                   substitutepv [("x", Symbol (prefix++"x"))] $
+>                       momentOfInertia section) -- J
+>           toList = map (\(c, a) -> (c, a)) . Map.toList
 >                      -- we convert coordinates to undimensioned CASExpr
->           sd y bn c [] [] = [(sectionLength section /. meter - c, y)]
+>           sd y bn c [] [] = [(sectionLength section -. c, y)]
 >           sd y bn c ((fc, f):fs) [] = addF y bn c fc f fs []
 >           sd y bn c [] ((bc, b):bs) = addB y bn c bc b [] bs
 >           sd y bn c ((fc, f):fs) ((bc, b):bs) =
 >               if fc <= bc
 >                  then addF y bn c fc f fs ((bc, b):bs)
 >                  else addB y bn c bc b ((fc, f):fs) bs
->           addF y bn c fc f fs bs = (fc-c,y) : sd ynew bn fc fs bs
->               where ynew = if rf /= 0
->                            then ynew' + partialSolutionRadialForce desc rf fc
+>           addF y bn c fc f fs bs = (fc-.c,y) : sd ynew bn fc fs bs
+>               where ynew = if rf /= 0.*newton
+>                            then ynew' +. partialSolutionRadialForce desc rf fc
 >                            else ynew'
->                     ynew' = if bm /= 0
->                            then y + partialSolutionBendingMoment desc bm fc
+>                     ynew' = if bm /= 0.*newton*.meter
+>                            then y +. partialSolutionBendingMoment desc bm fc
 >                            else y
->                     rf = radialForce f /. newton
->                     bm = bendingMoment f /. (newton*.meter)
+>                     rf = radialForce f
+>                     bm = bendingMoment f
 >           addB y bn c bc b fs bs =
->               (bc-c,y) -- length = bearing coordinate - start coordinate
->               : sd (y + partialSolutionRadialForce desc
->                     (Symbol $ prefix ++ "R" ++ show bn)
+>               (bc-.c,y) -- length = bearing coordinate - start coordinate
+>               : sd (y +. partialSolutionRadialForce desc
+>                     (Symbol (prefix ++ "R" ++ show bn) .* newton)
 >                     -- ^ we don't know bearing reaction yet, it's our unknown
 >                     bc) (bn+1) bc fs bs
 
-> getSectionDeflection :: SectionDeflections -> CASExpr -> CASExpr
+> getSectionDeflection :: SectionDeflections -> Value Meter -> Value Meter
 > getSectionDeflection (prefix, sd) c =
->     substitute (Map.fromList [(prefix++"x", (c/1000))]) $ leftmost sd (c/1000)
+>     substitutepv [(prefix++"x", c/.meter)] $ leftmost sd c
 
-> type SpindleDeflections = [(CASExpr, (Section, SectionDeflections))]
+> type SpindleDeflections = [(Value Meter, (Section, SectionDeflections))]
 
 > spindleDeflections :: Spindle -> SpindleDeflections
 > spindleDeflections sp = spd 1 sp
 >     where spd sn [] = []
->           spd sn (s:xs) = (sectionLength s /. meter,
+>           spd sn (s:xs) = (sectionLength s,
 >                            (s, sectionDeflections ("s"++show sn) s))
 >                           : spd (sn+1) xs
 
-> getSpindleDeflection :: SpindleDeflections -> CASExpr -> CASExpr
-> getSpindleDeflection sd c = getSectionDeflection secd (coord*1000)
->     where ((sec, secd), coord) = leftmost' sd (c/1000)
+> getSpindleDeflection :: SpindleDeflections -> Value Meter -> Value Meter
+> getSpindleDeflection sd c = getSectionDeflection secd coord
+>     where ((sec, secd), coord) = leftmost' sd c
 
+> getBearingReactions :: SpindleDeflections
+>                     -> [(Bearing, Value Meter, Value Newton)]
+> getBearingReactions sd = br (0.*mm) sd
+>     where br l [] = []
+>           br l ((len, (sec, defls)):xs) =
+>               map (\ (pos, b) -> (b, l+.pos,
+>                                   -- R=y*j
+>                                   getSectionDeflection defls pos *.
+>                                   radialRigidity b))
+>                       (Map.toAscList $ bearings sec)
+>               ++
+>               br (l +. sectionLength sec) xs
 
 Spindle equation system generation.
 
@@ -394,17 +428,18 @@ The equation system.
 > spindleEquationSystem :: SpindleDeflections -> [CASExpr]
 > spindleEquationSystem [] = []
 > spindleEquationSystem (s:xs) =
->     freeEnd (desc s) (0::CASExpr) (leftmost3 s 0)
+>     freeEnd (desc s) (0.*mm) (leftmost3 s (0.*mm))
 >     ++
 >     equationSystem s xs
 >   where -- description used in spindle equations (prefix, E, J)
 >         desc (l, (section, (prefix, defls))) =
->             (prefix, modulusOfElasticity (material section) /. pascal,
->              momentOfInertia section /. meter4)
+>             (prefix, modulusOfElasticity (material section),
+>              momentOfInertia section)
 >             
 >         sectionBoundaryConditions s@(l, (sec, (prefix, sd))) = concat $
->             map (\ ((c_m, bearing), bn) -> let c = c_m /. meter in
->                  radialBearing (desc s) c (Symbol $ prefix ++ "R" ++ show bn)
+>             map (\ ((c, bearing), bn) ->
+>                  radialBearing (desc s) c
+>                    (Symbol (prefix ++ "R" ++ show bn) .* newton)
 >                    (radialRigidity bearing) (rightmost sd c))
 >                 $ zipWith (,) (Map.toList $ bearings sec) [1..]
 >                   
@@ -413,12 +448,12 @@ The equation system.
 >         equationSystem s (ns:xs) =
 >             sectionBoundaryConditions s ++
 >             connected (desc s) (rightmost3 s (l s)) (l s)
->                       (desc ns) (leftmost3 ns 0) 
+>                       (desc ns) (leftmost3 ns (0.*mm)) 
 >                 ++ equationSystem ns xs
 >                    
 >         rightmost3 s = rightmost (snd $ snd $ snd s)
 >         leftmost3 s = leftmost (snd $ snd $ snd s)
->         l s = sectionLength (fst $ snd s) /. meter
+>         l s = sectionLength (fst $ snd s)
 
 Equation system unknowns.
 
@@ -441,7 +476,7 @@ Solving of spindle equation system using Maxima.
 >     --print solution
 >     let substSolution =
 >             case solution of
->                 List [List a] -> substitute (Map.fromList $ map toSubs a)
+>                 List [List a] -> substitutepv (map toSubs a)
 >                 _ -> error "solveSpindleDeflections: not solved"
 >             where toSubs (Equal (Symbol s) e) = (s, e)
 >                   toSubs _ = error "solveSpindleDeflections: invalid solution"
@@ -453,51 +488,38 @@ General utilities.
 Leftmost value from section list.
 Section list is a list of length-value pairs.
 
-> leftmost :: [(CASExpr, a)] -> CASExpr -> a
+> leftmost :: [(Value Meter, a)] -> Value Meter -> a
 > leftmost [] c = error "leftmost: coordinate is bigger than section list"
-> leftmost ((l,a):xs) c = if l >= c then a else leftmost xs (c-l)
+> leftmost ((l,a):xs) c = if l >= c then a else leftmost xs (c-.l)
 
 Leftmost section from section list & coordinate in returned section
 
-> leftmost' :: [(CASExpr, a)] -> CASExpr -> (a, CASExpr)
+> leftmost' :: [(Value Meter, a)] -> Value Meter -> (a, Value Meter)
 > leftmost' [] c = error "leftmost': coordinate is bigger than section list"
-> leftmost' ((l,a):xs) c = if l >= c then (a, c) else leftmost' xs (c-l)
+> leftmost' ((l,a):xs) c = if l >= c then (a, c) else leftmost' xs (c-.l)
 
 Rightmost value from section list.
 
-> rightmost :: [(CASExpr, a)] -> CASExpr -> a
+> rightmost :: [(Value Meter, a)] -> Value Meter -> a
 > rightmost [] c = error "rightmost: coordinate is bigger than section list"
-> rightmost ((l,a):x:xs) c = if l > c then a else rightmost (x:xs) (c-l)
-> rightmost ((l,a):xs) c = if l >= c then a else rightmost xs (c-l)
+> rightmost ((l,a):x:xs) c = if l > c then a else rightmost (x:xs) (c-.l)
+> rightmost ((l,a):xs) c = if l >= c then a else rightmost xs (c-.l)
 
 Moment inertia of circle
     pi/64*d^4
 
-> jCircle d = pi/64 * pv d meter**4
+> jCircle :: Value Meter -> Value Meter4
+> jCircle d = (pi/64) .* fourth d
 
 Area of circle.
 
-> areaOfCircle d = pi/4 * pv d meter**2
+> areaOfCircle :: Value Meter -> Value Meter2
+> areaOfCircle d = (pi/4) .* square d
 
 substitutepv - same as CASExpr.substitute but for physical values
 
 > substitutepv :: [(String, CASExpr)] -> Value a -> Value a
 > substitutepv s (Value v) = Value (substitute (Map.fromList s) v)
-
-Utility type class which convert physical values to CAS values
-and don't change values if they are already CASExpr.
-
-> pv v t = physicalValueToCASExpr v t
-
-> class PhysicalValueToCASExpr v t where
->     physicalValueToCASExpr :: v -> t -> CASExpr
-
-> instance PhysicalValueToCASExpr CASExpr (Value a) where
->     physicalValueToCASExpr a _ = a
-> instance (DimensionDivide a a NonDim) =>
->     PhysicalValueToCASExpr (Value a) (Value a) where
->     physicalValueToCASExpr a d = a /. d
-
 
 --------------------------------------------------------------------------------
 
@@ -531,16 +553,18 @@ Parameters:
 >         j = 120 .* newton /. micro meter
 >         --j = 12 .* kgf /. micro meter
 >         s = generalSolution desc
->         sf = s  + partialSolutionRadialForce desc (1.*newton) c
->         s1 = sf + partialSolutionRadialForce desc (Symbol "R1") b
->         s2 = s1 + partialSolutionRadialForce desc (Symbol "R2") (a+.b)
+>         r1 = Symbol "R1" .* newton
+>         r2 = Symbol "R2" .* newton
+>         sf = s  +. partialSolutionRadialForce desc (1.*newton) c
+>         s1 = sf +. partialSolutionRadialForce desc r1 b
+>         s2 = s1 +. partialSolutionRadialForce desc r2 (a+.b)
 >     let eqlist = (freeEnd desc c s ++
 >                   freeEnd desc (a+.b) s2 ++
->                   radialBearing desc b (Symbol "R1") j s1 ++
->                   radialBearing desc (a+.b) (Symbol "R2") j s2)
+>                   radialBearing desc b r1 j s1 ++
+>                   radialBearing desc (a+.b) r2 j s2)
 >     r <- eval i $ solve eqlist ["A0", "A1", "A2", "A3", "R1", "R2"]
 >     let List [a] = r
->     y0 <- eval i $ Funcall CFSubst [a, sf]
+>     y0 <- eval i $ Funcall CFSubst [a, sf/.meter]
 >     mapM_ (\ i -> do let y = (CASExpr.eval $
 >                               substitute (Map.fromList [("x", i)]) y0)
 >                              :: ExactNumber
@@ -554,7 +578,7 @@ The same as testCase1 but spindle is splitted in two sections.
 > testCase1' = withInterpreter $ \i -> do
 >     let d = 100 .* mm
 >         sj = jCircle d
->         e = modulusOfElasticity steel /. pascal
+>         e = modulusOfElasticity steel
 >         desc1 = ("s1", e, sj)
 >         desc2 = ("s2", e, sj)
 >         c = 0 .* mm
@@ -564,20 +588,22 @@ The same as testCase1 but spindle is splitted in two sections.
 >         --j = 12 .* kgf /. micro meter
 >         s1 = generalSolution desc1
 >         s2 = generalSolution desc2
->         s1f = s1  + partialSolutionRadialForce desc1 (1.*newton) c
->         s11 = s1f + partialSolutionRadialForce desc1 (Symbol "R1") b
->         s22 = s2  + partialSolutionRadialForce desc2 (Symbol "R2") (0.5.*a)
+>         r1 = Symbol "R1" .* newton
+>         r2 = Symbol "R2" .* newton
+>         s1f = s1  +. partialSolutionRadialForce desc1 (1.*newton) c
+>         s11 = s1f +. partialSolutionRadialForce desc1 r1 b
+>         s22 = s2  +. partialSolutionRadialForce desc2 r2 (0.5.*a)
 >     let eqlist = (freeEnd desc1 c s1 ++
 >                   freeEnd desc2 (0.5.*(a+.b)) s22 ++
->                   connected desc1 s11 0.5 desc2 s2 ++
->                   radialBearing desc1 b (Symbol "R1") j s11 ++
->                   radialBearing desc2 (0.5.*a) (Symbol "R2") j s22)
+>                   connected desc1 s11 (500.*mm) desc2 s2 ++
+>                   radialBearing desc1 b r1 j s11 ++
+>                   radialBearing desc2 (0.5.*a) r2 j s22)
 >     r <- eval i $ solve eqlist ["s1A0", "s1A1", "s1A2", "s1A3",
 >                                 "s2A0", "s2A1", "s2A2", "s2A3",
 >                                 "R1", "R2"]
 >     print r
 >     let List [a] = r
->     y0 <- eval i $ Funcall CFSubst [a, s1f]
+>     y0 <- eval i $ Funcall CFSubst [a, s1f/.meter]
 >     mapM_ (\ i -> do let y = (CASExpr.eval $
 >                               substitute (Map.fromList [("s1x", i)]) y0)
 >                              :: ExactNumber
