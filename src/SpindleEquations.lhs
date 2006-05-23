@@ -100,6 +100,15 @@ Radial force description.
 >                                    bendingMoment = 0 .* newton *. meter })
 >                           (forces s) }
 
+Bending moment description.
+
+> addBendingMoment :: Spindle -> (Value NewtonMulMeter, Value Meter) -> Spindle
+> addBendingMoment sp (moment, c) = modifySectionAt addbm sp c
+>     where addbm s c = s { forces = Map.insert c
+>                           (Force { radialForce = 0 .* newton,
+>                                    bendingMoment = moment })
+>                           (forces s) }
+
 Bearing description.
 
 > addBearing :: Spindle -> (Bearing, Value Meter) -> Spindle
@@ -138,6 +147,7 @@ Fixities for construction functions and operators
 > infixl 6 `at`                 -- same fixity as +
 > infixr 6 <+>                  -- same fixity as +
 > infixl 5 `addRadialForce`     -- same fixity as ++, but left associative
+> infixl 5 `addBendingMoment`   -- same fixity as ++, but left associative
 > infixl 5 `addBearing`         -- same fixity as ++, but left associative
 > infixl 5 `cut`                -- same fixity as ++
 
@@ -419,7 +429,7 @@ i.e. A0...A3 become (prefix++A0...) and all reactions become prefixR1,2,...
 >                                   radialRigidity b))
 >                       (Map.toAscList $ bearings sec)
 >               ++
->               br (l +. sectionLength sec) xs
+>               br (l +. len) xs
 
 Spindle equation system generation.
 
@@ -428,7 +438,7 @@ The equation system.
 > spindleEquationSystem :: SpindleDeflections -> [CASExpr]
 > spindleEquationSystem [] = []
 > spindleEquationSystem (s:xs) =
->     freeEnd (desc s) (0.*mm) (leftmost3 s (0.*mm))
+>     freeEnd (desc s) (0.*mm) (leftmost3' s)
 >     ++
 >     equationSystem s xs
 >   where -- description used in spindle equations (prefix, E, J)
@@ -444,15 +454,15 @@ The equation system.
 >                 $ zipWith (,) (Map.toList $ bearings sec) [1..]
 >                   
 >         equationSystem s [] = sectionBoundaryConditions s ++
->                               freeEnd (desc s) (l s) (rightmost3 s (l s))
+>                               freeEnd (desc s) (l s) (rightmost3' s)
 >         equationSystem s (ns:xs) =
 >             sectionBoundaryConditions s ++
->             connected (desc s) (rightmost3 s (l s)) (l s)
->                       (desc ns) (leftmost3 ns (0.*mm)) 
+>             connected (desc s) (rightmost3' s) (l s)
+>                       (desc ns) (leftmost3' ns) 
 >                 ++ equationSystem ns xs
 >                    
->         rightmost3 s = rightmost (snd $ snd $ snd s)
->         leftmost3 s = leftmost (snd $ snd $ snd s)
+>         rightmost3' s = snd $ last $ snd $ snd $ snd s
+>         leftmost3'  s = snd $ head $ snd $ snd $ snd s
 >         l s = sectionLength (fst $ snd s)
 
 Equation system unknowns.
@@ -468,20 +478,36 @@ Equation system unknowns.
 
 Solving of spindle equation system using Maxima.
 
-> solveSpindleDeflections :: Interpreter -> Spindle -> IO SpindleDeflections
-> solveSpindleDeflections i s = do
->     let sd = spindleDeflections s
+> solveSpindle :: Interpreter -> Spindle -> IO SpindleDeflections
+> solveSpindle i s = solveSpindleDeflections i (spindleDeflections s)
+
+> solveSpindleDeflections :: Interpreter -> SpindleDeflections
+>                         -> IO SpindleDeflections
+> solveSpindleDeflections i sd = do
 >     solution <- eval i $ solve (spindleEquationSystem sd)
 >                 (spindleEquationSystemUnknowns sd)
 >     --print solution
 >     let substSolution =
 >             case solution of
->                 List [List a] -> substitutepv (map toSubs a)
+>                 List [List a] -> map toSubs a
 >                 _ -> error "solveSpindleDeflections: not solved"
 >             where toSubs (Equal (Symbol s) e) = (s, e)
 >                   toSubs _ = error "solveSpindleDeflections: invalid solution"
->     return $ map (\ (l, (s, (p, sd))) ->
->                   (l, (s, (p, map (\ (l,d) -> (l, substSolution d)) sd)))) sd
+>     return $ substituteSpindleDeflectionsParams substSolution sd
+
+> substituteSpindleDeflectionsParams :: [(String, CASExpr)]
+>                                    -> SpindleDeflections -> SpindleDeflections
+> substituteSpindleDeflectionsParams kvl sd =
+>     let subst = substitutepv kvl in
+>     map (\ (l, (s, (p, secd))) ->
+>          (subst l,
+>           (s { sectionLength = subst $ sectionLength s 
+>              },
+>            (p,
+>             map (\ (l,d) -> (subst l, subst d)) secd))))
+>     sd
+
+TODO: ^ actually we also must substitute section lengthes, diameters, etc.
 
 General utilities.
 

@@ -28,6 +28,7 @@ This module is temporary. Its used for manual course work spindle optimization.
 > import TypeLevelPhysicalValue
 > import TypeLevelPhysicalUnitsList
 > import Maxima hiding (eval)
+> import qualified Maxima
 > import ExactNumber
 > import Bearing
 > import Bearings.FAG.SpindleBearings
@@ -39,37 +40,81 @@ Console force of 1N and five FAG bearings.
 Geometry is simplified against real spindle (many groves are removed),
 but for deflection calculation it's OK.
 
+> for fun pred l f = mapM_ f (filter (fun `is` pred) l)
+
+> main = withInterpreter $ \i -> do
+>     let sd = spindleDeflections testSpindle
+>     --print sd
+>     --print $ spindleEquationSystem sd
+>     baseSsd <- solveSpindleDeflections i sd
+>     let baseS = substdL 0 baseSsd
+>     --print baseS
+>     let baseLife = minimum $ map (\ (b, p, n) -> abs $ eval $ cdyn b /. n)
+>                    (getBearingReactions baseS)
+>         baseRigidity = rigidity baseS
+>     for innerDiameter (>= 75.*mm) std15 $ \ b1 -> do
+>       for innerDiameter (== 60.*mm) std15 $ \ b2 -> do
+>         --let b2 = findBearingByCode "B7012C.T.P4S"
+>         sd <- solveSpindle i (testSpindleConstructor b1 b2)
+>         let sd0 = getSpindleDeflection sd (0.*mm)
+>         -- dLopt <- Maxima.eval i $ solve [diff sd0 "dL" `Equal` 0] ["dL"]
+>         -- diff sd0 has dL^6,dL^5, etc. maxima can only solve x^4...=0         
+>         let (sd0opt, dLopt) = minimum $
+>                               map (\ dl -> (abs $ eval $ substitutepv [("dL",dl/1000)] sd0
+>                                             /. nano meter :: Double, dl/1000)) [-40..200]
+>         let s = substdL 0 sd
+>         let sopt = substdL dLopt sd
+>         -- 32sec/16schemes = 2 sec per solveSpindleDeflections
+>         -- 18sec/16schemes  when ghc -O
+>         tabbed 9 (shortSode b1)
+>         tabbed 9 (shortSode b2)
+>         --printf "%5.3f | " $ deflection s
+>         printf "%5.1f | " $ rigidity s
+>         printf "%5.3f | " $ rigidity s / baseRigidity
+>         printf "%5.2f | " $ relativeLife baseLife s
+>         printf "%5.0f | " $ evald (dLopt*1000)
+>         --printf "%5.3f | " $ deflection sopt
+>         printf "%5.1f | " $ rigidity sopt
+>         printf "%5.3f | " $ rigidity sopt / baseRigidity
+>         printf "%5.2f | " $ relativeLife baseLife sopt
+>         --mapM_ (\ (b, p, n) -> --tabbed 6 (take 6 $ show $
+>         --                      printf "%6.2f | " (((abs $ (evald $ cdyn b/.n )) / baseLife)**3))
+>         --          (getBearingReactions s)
+>         putStrLn ""
+
+
+Evaluation utilities.
+
+> substdL dl = substituteSpindleDeflectionsParams [("dL",dl)]
+
+> evald a = eval a :: Double
+
+> relativeLifes baseLife s =
+>     map (\ (b, p, n) -> ((abs $ (evald $ cdyn b/.n )) / baseLife)**3)
+>             (getBearingReactions s)
+
+> relativeLife baseLife s = minimum $ relativeLifes baseLife s
+
+Console deflection, nano meter per 1 newton
+
+> deflection s = (abs $ evald (getSpindleDeflection s (0.*mm) /. nano meter))
+
+Spindle rigidity N/mum
+
+> rigidity s = (abs $ evald ((1 ./ getSpindleDeflection s (0.*mm)) *. micro meter))
+
+
+Bearing filtering utilities.
+
 > all15 = filter
->     (contactAngle `is` (inexactEq (15*degree)))
+>     (contactAngle `is` (inexactEq (15*degree))
+>      &&&
+>      attainableSpeedGrease `is` (>= (7000/0.65).*rpm))
 >     bearingsList
 
 > std15 = filter
 >     (bearingType `is` (== "Standard bearing. Steel balls."))
 >     all15
-
-> for fun pred l f = mapM_ f (filter (fun `is` pred) l)
-
-> main = testCase
-
-> testCase = withInterpreter $ \i -> do
->     baseS <- solveSpindleDeflections i testSpindle
->     let baseLife = minimum $ map (\ (b, p, n) -> abs $ eval $ cdyn b /. n)
->                    (getBearingReactions baseS)
->     for innerDiameter (== 75.*mm) std15 $ \ b1 -> do
->       for innerDiameter (== 60.*mm) std15 $ \ b2 -> do
->         --let b2 = findBearingByCode "B7012C.T.P4S"
->         s <- solveSpindleDeflections i (testSpindleConstructor b1 b2)
->         -- 32sec/16schemes = 2 sec per solveSpindleDeflections
->         -- 18sec/16schemes  when ghc -O
->         tabbed 16 (code b1)
->         tabbed 16 (code b2)
->         tabbed 10 (take 10 $ show $ eval (getSpindleDeflection s (0.*mm) /. nano meter))
->         mapM_ (\ (b, p, n) -> --tabbed 6 (take 6 $ show $
->                               printf "%5.2f | " (((abs $ (eval $ cdyn b/.n :: Double)) / baseLife)**3))
->                   (getBearingReactions s)
->         putStrLn ""
-
-> 
 
 > is f predicate = predicate . f
 
@@ -80,6 +125,16 @@ but for deflection calculation it's OK.
 > infixr 3 &&&          -- &&
 > infixr 2 |||          -- ||
 
+Output helpers.
+
+> tabbed n s = do putStr s
+>                 putStr $ (take (n - length s) $ repeat ' ') ++ " | "
+
+> shortSode = takeWhile ((/=) '.') . code
+
+
+Spindle description construction.
+
 > testSpindle = testSpindleConstructor fagB7015C fagB7012C
 >   where fagB7015C = findBearingByCode "B7015C.T.P4S"
 >         fagB7012C = findBearingByCode "B7012C.T.P4S"
@@ -87,8 +142,13 @@ but for deflection calculation it's OK.
 > testSpindleConstructor b1 b2 =
 >     -- shaft
 >     --makeRigid
->     ((cyl 82 13 <+> cyl 133 23 <+> cyl 120 8
->       <+> cyl (innerDiameter b1 /. mm) (147.5+3*wd1)
+>     modifySectionAt (\ s _ -> s { sectionLength = sectionLength s
+>                                   +. Symbol "dL" .* meter 
+>                                 })
+>     (((cyl 82 13 <+> cyl 133 23 <+> cyl 120 8
+>       -- <+> cyl (innerDiameter b1 /. mm) (147.5+3*wd1)
+>       <+> cyl (innerDiameter b1 /. mm) 100
+>       <+> cyl (innerDiameter b1 /. mm) (47.5+3*wd1) -- dL here
 >       <+> cyl 67 90
 >       <+> cyl (innerDiameter b2 /. mm) (62.5+2*wd2)
 >       <+> cyl 57 96)
@@ -96,13 +156,15 @@ but for deflection calculation it's OK.
 >      (cyl 55 30 <+> cyl 45 73 <+> cyl 35 (337+3*wd1+2*wd2)))
 >     -- forces
 >     `addRadialForce` 1.*newton `at` 0.*mm
+>     --`addBendingMoment` (0.2.*newton*.meter) `at` 1.*mm
 >     -- front bearing set
 >     `addBearing` b1 `at` (44+27+0.5*wd1).*mm
 >     `addBearing` b1 `at` (44+47+1.5*wd1).*mm
 >     `addBearing` b1 `at` (44+79+2.5*wd1).*mm
 >     -- rear bearing set
 >     `addBearing` b2 `at` (281.5+31+3*wd1+0.5*wd2).*mm
->     `addBearing` b2 `at` (281.5+49+3*wd1+1.5*wd2).*mm
+>     `addBearing` b2 `at` (281.5+49+3*wd1+1.5*wd2).*mm)
+>     ((44+100 + 1).*mm) -- coordinate of section where dL is added to length
 >     -- end
 >   where cyl d l = cylinder (d.*mm) (l.*mm)
 >         wd1 = (width b1 -. width fagB7015C) /. mm
@@ -111,9 +173,6 @@ but for deflection calculation it's OK.
 >         fagB7012C = findBearingByCode "B7012C.T.P4S"
 
 
-
-> tabbed n s = do putStr s
->                 putStr $ (take (n - length s) $ repeat ' ') ++ " | "
 
 -- > num n v = tabbed 8 s
 -- >     where s = case n /. v of
