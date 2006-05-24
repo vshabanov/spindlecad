@@ -418,6 +418,16 @@ i.e. A0...A3 become (prefix++A0...) and all reactions become prefixR1,2,...
 > getSpindleDeflection sd c = getSectionDeflection secd coord
 >     where ((sec, secd), coord) = leftmost' sd c
 
+> getSpindleDeflections :: SpindleDeflections -> [Value Meter]
+>                       -> [(Value Meter, Value Meter)]
+> getSpindleDeflections sd coords =
+>     map (\ c -> (c, getSpindleDeflection sd c)) coords
+
+> getSpindleDeflectionsLength :: SpindleDeflections -> Value Meter
+> getSpindleDeflectionsLength s = l (0.*meter) s
+>     where l acc [] = acc
+>           l acc ((len, _):xs) = l (acc +. len) xs
+
 > getBearingReactions :: SpindleDeflections
 >                     -> [(Bearing, Value Meter, Value Newton)]
 > getBearingReactions sd = br (0.*mm) sd

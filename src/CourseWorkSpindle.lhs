@@ -34,6 +34,7 @@ This module is temporary. Its used for manual course work spindle optimization.
 > import Bearings.FAG.SpindleBearings
 > import SpindleEquations
 > import Text.Printf
+> import Drawing
 
 The spindle of machine tool used in course work.
 Console force of 1N and five FAG bearings.
@@ -66,8 +67,8 @@ but for deflection calculation it's OK.
 >         let sopt = substdL dLopt sd
 >         -- 32sec/16schemes = 2 sec per solveSpindleDeflections
 >         -- 18sec/16schemes  when ghc -O
->         tabbed 9 (shortSode b1)
->         tabbed 9 (shortSode b2)
+>         tabbed 9 (shortCode b1)
+>         tabbed 9 (shortCode b2)
 >         --printf "%5.3f | " $ deflection s
 >         printf "%5.1f | " $ rigidity s
 >         printf "%5.3f | " $ rigidity s / baseRigidity
@@ -80,6 +81,10 @@ but for deflection calculation it's OK.
 >         --mapM_ (\ (b, p, n) -> --tabbed 6 (take 6 $ show $
 >         --                      printf "%6.2f | " (((abs $ (evald $ cdyn b/.n )) / baseLife)**3))
 >         --          (getBearingReactions s)
+>         exportToACAD (deflectionLine (10 .* mm /. nano meter) s)
+>                  ("c:/" ++ shortCode b1 ++ "-" ++ shortCode b2 ++ ".lsp")
+>         exportToACAD (deflectionLine (10 .* mm /. nano meter) sopt)
+>                  ("c:/" ++ shortCode b1 ++ "-" ++ shortCode b2 ++ "-opt.lsp")
 >         putStrLn ""
 
 
@@ -103,6 +108,12 @@ Spindle rigidity N/mum
 
 > rigidity s = (abs $ evald ((1 ./ getSpindleDeflection s (0.*mm)) *. micro meter))
 
+Deflection line drawing
+
+> deflectionLine scale s = Spline NormalLine $
+>                          map (\ (x, y) -> Point x (scale.*y)) deflections
+>     where deflections = getSpindleDeflections s [0.*mm, 1.*mm ..
+>                                                  getSpindleDeflectionsLength s]
 
 Bearing filtering utilities.
 
@@ -130,7 +141,7 @@ Output helpers.
 > tabbed n s = do putStr s
 >                 putStr $ (take (n - length s) $ repeat ' ') ++ " | "
 
-> shortSode = takeWhile ((/=) '.') . code
+> shortCode = takeWhile ((/=) '.') . code
 
 
 Spindle description construction.

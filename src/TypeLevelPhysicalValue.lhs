@@ -44,7 +44,7 @@ all values are made of Double type.
 This is subject to change (all values as Rational). Think
 about it after CAS interface & constraint solver are done.
 
-> data Value d = Value CASExpr deriving (Eq, Ord, Show)
+> newtype Value d = Value CASExpr deriving (Eq, Ord, Show, Enum)
 
 > type NondimensionalValue = CASExpr
 > type Angle = NondimensionalValue

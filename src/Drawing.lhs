@@ -21,9 +21,9 @@
 Primitive 2D drawing description data type & simple exporting to ACAD lisp.
 
 > module Drawing (
->     Drawing,
->     Point,
->     LineStyle,
+>     Drawing(..),
+>     Point(..),
+>     LineStyle(..),
 >     exportToACAD -- :: Drawing -> FilePath -> IO () / exportToACAD "file.lsp"
 >   ) where
 
