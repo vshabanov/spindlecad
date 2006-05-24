@@ -49,7 +49,7 @@ Show instance for lisp values
 >     show (Symbol s) = s
 >     show (String s) = show s
 >     show (List l) = "(" ++ unwords (map show l) ++ ")"
->     show (Quote v) = '`' : show v
+>     show (Quote v) = '\'' : show v
 >     show (AntiQuote v) = ',' : show v
 
 
@@ -116,7 +116,7 @@ Parser for lisp values
 >                l <- endBy parseExpr spaces
 >                char ')'
 >                return $ List l
->         <|> do char '`'
+>         <|> do char '\''
 >                expr <- parseExpr
 >                return $ Quote expr
 >         <|> do char ','

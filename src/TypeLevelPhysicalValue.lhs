@@ -47,6 +47,7 @@ about it after CAS interface & constraint solver are done.
 > data Value d = Value CASExpr deriving (Eq, Ord, Show)
 
 > type NondimensionalValue = CASExpr
+> type Angle = NondimensionalValue
 
 Basic units
 
