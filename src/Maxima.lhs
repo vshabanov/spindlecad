@@ -39,6 +39,7 @@ Interface to Maxima computer algebra system.
 > import qualified Data.Map as Map
 > import qualified Lisp
 > import CASExpr hiding (eval)
+> import qualified Data.ByteString.Char8 as B
 
 Type of Maxima command line interpreter.
 
@@ -67,7 +68,7 @@ CAS expression evaluation
 
 > debugEval :: Interpreter -> CASExpr -> IO CASExpr
 > debugEval i e = do putStrLn "--------- To Maxima ---------"
->                    print $ toLisp e
+>                    B.putStrLn $ Lisp.bshow $ toLisp e
 >                    sendCAS i e
 >                    a <- receiveAnswer i
 >                    putStrLn "-------- From Maxima --------"
@@ -116,6 +117,9 @@ Sends string to maxima interpreter and appends newline
 > sendCommand :: Interpreter -> String -> IO ()
 > sendCommand (inp,_,_,_) cmd = hPutStrLn inp cmd
 
+> bsendCommand :: Interpreter -> B.ByteString -> IO ()
+> bsendCommand (inp,_,_,_) cmd = B.hPut inp cmd >> hPutStrLn inp ""
+
 String answer receiver.
 Return string between last answer and MAXIMA> prompt,
 i.e. maxima output between two "MAXIMA>" lines.
@@ -139,7 +143,7 @@ i.e. maxima output between two "MAXIMA>" lines.
 Lisp command sender.
 
 > sendLisp :: Interpreter -> Lisp.Value -> IO ()
-> sendLisp i l = sendCommand i (show l)
+> sendLisp i l = bsendCommand i (Lisp.bshow l)
 
 Lisp answer receiver.
 Since there can be non-lisp strings in answer
@@ -174,7 +178,8 @@ When no lisp value found error raised.
 CAS command sender.
 
 > sendCAS :: Interpreter -> CASExpr -> IO ()
-> sendCAS i c = sendCommand i (show $ toLisp c)
+> --sendCAS i c = sendCommand i (show $ toLisp c)
+> sendCAS i c = sendLisp i (toLisp c)
 
 CAS expression receiver.
 

@@ -25,6 +25,7 @@ Lisp value and lisp value I/O
 > import Control.Monad
 > import Text.ParserCombinators.Parsec
 > import Data.Ratio
+> import qualified Data.ByteString.Char8 as B
 
 
 Lisp values data type
@@ -52,6 +53,19 @@ Show instance for lisp values
 >     show (Quote v) = '\'' : show v
 >     show (AntiQuote v) = ',' : show v
 
+> bshow :: Value -> B.ByteString
+> bshow (Integer i) = B.pack $ show i
+> bshow (Rational r) = B.concat [B.pack $ show (numerator r),
+>                                B.packChar '/',
+>                                B.pack $ show (denominator r)]
+> bshow (Double d) = B.pack $ show d
+> bshow (Symbol s) = B.pack $ s
+> bshow (String s) = B.pack $ show s
+> bshow (List l) = B.concat [B.packChar '(',
+>                            B.unwords (map bshow l),
+>                            B.packChar ')']
+> bshow (Quote v) = B.cons '\'' $ bshow v
+> bshow (AntiQuote v) = B.cons ',' $ bshow v
 
 Parser for lisp values
 
