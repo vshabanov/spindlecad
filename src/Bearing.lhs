@@ -60,7 +60,9 @@ For the moment we have simple all-in-one type.
 >                  radialRigidity :: Value NewtonDivMeter,
 >                  axialRigidity :: Value NewtonDivMeter, -- Sa
 >                  cdyn :: Value Newton,  -- Cdyn   - dynamic load rating
->                  c0stat :: Value Newton -- C0stat - static load rating
+>                  c0stat :: Value Newton, -- C0stat - static load rating
+>                  innerRingRadialRunout :: Value Meter,
+>                  outerRingRadialRunout :: Value Meter
 >                }
 >     deriving (Eq, Ord, Show)
 
@@ -90,5 +92,7 @@ Bearing dimension series.
 >               radialRigidity = j,
 >               axialRigidity = undefined,
 >               cdyn = undefined,
->               c0stat = undefined
+>               c0stat = undefined,
+>               innerRingRadialRunout = undefined,
+>               outerRingRadialRunout = undefined
 >             }

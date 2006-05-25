@@ -27,6 +27,7 @@ List of FAG hi-precision spindle bearings and their parameters
 >   ) where
 
 > import Bearing
+> import TypeLevelPhysicalDimension
 > import TypeLevelPhysicalValue
 > import TypeLevelPhysicalUnitsList
 > import Text.ParserCombinators.Parsec
@@ -131,7 +132,9 @@ Bearing description string parsing routines.
 >                   radialRigidity = (if cangl == 15*degree then 6/2 else 2/2) .* sal,
 >                   axialRigidity = (1/2) .* sal,
 >                   cdyn = cdyn,
->                   c0stat = c0stat
+>                   c0stat = c0stat,
+>                   innerRingRadialRunout = innerRingRadialRunoutP4S bbore,
+>                   outerRingRadialRunout = outerRingRadialRunoutP4S dD
 >                 }
 
 > num :: Value a -> Parser (Value a)
@@ -201,3 +204,55 @@ Bearing description string parsing routines.
 > spindleBearingAccuracy =
 >     [(".P4S", "P4S FAG standard accuracy."),
 >      (".P4" , "P4 FAG standard accuracy.")]
+
+
+Tolerances. Spindle bearings. Tolerance class P4S.
+
+> innerRingRadialRunoutP4S d = findByDiameter innerRingTolerancesP4S d
+
+> outerRingRadialRunoutP4S d = findByDiameter outerRingTolerancesP4S d
+
+> innerRingTolerancesP4S =
+>     [t   0  10  (0, -4)  1.5,
+>      t  10  18  (0, -4)  1.5,
+>      t  18  30  (0, -5)  2.5,
+>      t  30  50  (0, -6)  2.5,
+>      t  50  80  (0, -7)  2.5,
+>      t  80 120  (0, -8)  2.5,
+>      t 120 150  (0,-10)  2.5,
+>      t 150 180  (0,-10)  5,
+>      t 180 250  (0,-12)  5,
+>      t 250 315  (0,-15)  6,
+>      t 315 400  (0,-19)  7,
+>      t 400 500  (0,-23)  8,
+>      t 500 630  (0,-26)  9
+>     ]
+>     where t dOver dIncl boreDeviation radialRunout =
+>               ((dOver .* mm, dIncl .* mm),
+>                (radialRunout .* micro meter))
+
+> outerRingTolerancesP4S =
+>     [t  10  18  (0, -4)  1.5,
+>      t  18  30  (0, -5)  2.5,
+>      t  30  50  (0, -6)  2.5,
+>      t  50  80  (0, -7)  4,
+>      t  80 120  (0, -8)  5,
+>      t 120 150  (0, -9)  5,
+>      t 150 180  (0,-10)  5,
+>      t 180 250  (0,-11)  7,
+>      t 250 315  (0,-13)  7,
+>      t 315 400  (0,-15)  8,
+>      t 400 500  (0,-18)  9,
+>      t 500 630  (0,-22)  11,
+>      t 630 800  (0,-26)  13
+>     ]
+>     where t dOver dIncl outsideDiamterDeviation radialRunout =
+>               ((dOver .* mm, dIncl .* mm),
+>                (radialRunout .* micro meter))
+
+> findByDiameter :: [((Value Meter, Value Meter), a)] -> Value Meter -> a
+> findByDiameter [] _ = error "findByDiameter: diameter too large"
+> findByDiameter (((dOver, dIncl), r):xs) d =
+>     if d <= dOver then error "findByDiameter: diameter too small"
+>     else if d <= dIncl then r
+>     else findByDiameter xs d
