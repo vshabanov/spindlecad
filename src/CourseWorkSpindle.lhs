@@ -44,7 +44,7 @@ but for deflection calculation it's OK.
 > for fun pred l f = mapM_ f (filter (fun `is` pred) l)
 
 > main = withInterpreter $ \i -> do
->     let sd = spindleDeflections testSpindle
+>     let sd = substpi $ spindleDeflections testSpindle
 >     --print sd
 >     --print $ spindleEquationSystem sd
 >     baseSsd <- solveSpindleDeflections i sd
@@ -56,7 +56,8 @@ but for deflection calculation it's OK.
 >     for innerDiameter (>= 75.*mm) std15 $ \ b1 -> do
 >       for innerDiameter (== 60.*mm) std15 $ \ b2 -> do
 >         --let b2 = findBearingByCode "B7012C.T.P4S"
->         sd <- solveSpindle i (testSpindleConstructor b1 b2)
+>         sd <- solveSpindleDeflections i
+>               (substpi $ spindleDeflections $ testSpindleConstructor b1 b2)
 >         let sd0 = getSpindleDeflection sd (0.*mm)
 >         -- dLopt <- Maxima.eval i $ solve [diff sd0 "dL" `Equal` 0] ["dL"]
 >         -- diff sd0 has dL^6,dL^5, etc. maxima can only solve x^4...=0         
@@ -90,9 +91,9 @@ but for deflection calculation it's OK.
 
 Evaluation utilities.
 
-> substdL dl = substituteSpindleDeflectionsParams [("dL",dl),
->                                                  ("_cas_pi",Rational $ toRational pi)]
->                                                  -- ^^^ somewhat dirty optimization
+> substdL dl = substituteSpindleDeflectionsParams [("dL",dl)]
+
+> substpi = substituteSpindleDeflectionsParams [("_cas_pi",Rational $ toRational pi)]
 
 > evald a = eval a :: Double
 
