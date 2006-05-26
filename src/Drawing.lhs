@@ -64,8 +64,8 @@ AutoCAD lisp file exporting.
 
 > exportToACAD :: Drawing -> FilePath -> IO ()
 > exportToACAD d s = bracket (openFile s WriteMode) hClose $ \ h -> do
->     mapM_ (hPutStrLn h . show) layersSetup
->     mapM_ (hPutStrLn h . show) $ drawingCommands d
+>     mapM_ (\ l -> hPutLisp h l >> hPutStrLn h "") layersSetup
+>     mapM_ (\ l -> hPutLisp h l >> hPutStrLn h "") $ drawingCommands d
 
 
 Call AutoCAD command:

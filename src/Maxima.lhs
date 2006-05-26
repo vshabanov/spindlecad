@@ -131,19 +131,45 @@ i.e. maxima output between two "MAXIMA>" lines.
 >         Left e -> error ("Incorrect maxima answer:" ++ e)
 >         Right a -> return a
 >   where answer acc =
->               try (do string "MAXIMA>" <?> "Maxima prompt (\"MAXIMA>\")"
->                       return $ Right $ reverse acc)
->               <|> try (do string "(%i"
->                           many1 digit
->                           string ")"
->                           return $ Left $ reverse acc)
->               <|> (do c <- anyChar
->                       answer (c:acc))
+>               -- try (do string "MAXIMA>" <?> "Maxima prompt (\"MAXIMA>\")"
+>               --         return $ Right $ reverse acc)
+>               -- <|> try (do string "(%i"
+>               --             many1 digit
+>               --             string ")"
+>               --             return $ Left $ reverse acc)
+>               -- <|> (do c <- anyChar
+>               --         answer (c:acc))
+>               -- The code below is more fast variant of the code above.
+>               -- TODO: we must use Alex & Happy for lexing and parsing
+>               --       of lisp values & maxima output
+>               do c <- anyChar
+>                  if c == '('
+>                   then
+>                     do c2 <- anyChar
+>                        if c2 == '%'
+>                          then (do char 'i'
+>                                   many1 digit
+>                                   char ')'
+>                                   return $ Left $ reverse acc)
+>                          else  answer (c2:c:acc)
+>                   else if c == 'M'
+>                    then
+>                     do c2 <- anyChar 
+>                        if c2 == 'A' then
+>                           try (do string "XIMA>"
+>                                   return $ Right $ reverse acc)
+>                           <|>
+>                           answer (c2:c:acc)
+>                         else answer (c2:c:acc)
+>                    else
+>                     answer (c:acc)
+
 
 Lisp command sender.
 
 > sendLisp :: Interpreter -> Lisp.Value -> IO ()
-> sendLisp i l = bsendCommand i (Lisp.bshow l)
+> --sendLisp i l = bsendCommand i (Lisp.bshow l)
+> sendLisp (inp,_,_,_) l = Lisp.hPutLisp inp l >> hPutStrLn inp ""
 
 Lisp answer receiver.
 Since there can be non-lisp strings in answer
@@ -178,8 +204,8 @@ When no lisp value found error raised.
 CAS command sender.
 
 > sendCAS :: Interpreter -> CASExpr -> IO ()
-> --sendCAS i c = sendCommand i (show $ toLisp c)
-> sendCAS i c = sendLisp i (toLisp c)
+> --sendCAS i c = sendCommand i (show $ toLisp c) -- 6.0% in profinling
+> sendCAS i c = sendLisp i (toLisp c)             -- 4.5% --//--
 
 CAS expression receiver.
 

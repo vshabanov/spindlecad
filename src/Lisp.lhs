@@ -25,6 +25,8 @@ Lisp value and lisp value I/O
 > import Control.Monad
 > import Text.ParserCombinators.Parsec
 > import Data.Ratio
+> import Data.Char
+> import System.IO
 > import qualified Data.ByteString.Char8 as B
 
 
@@ -53,6 +55,8 @@ Show instance for lisp values
 >     show (Quote v) = '\'' : show v
 >     show (AntiQuote v) = ',' : show v
 
+Data.ByteString "show" function. Its more faster than usual show
+
 > bshow :: Value -> B.ByteString
 > bshow (Integer i) = B.pack $ show i
 > bshow (Rational r) = B.concat [B.pack $ show (numerator r),
@@ -66,6 +70,26 @@ Show instance for lisp values
 >                            B.packChar ')']
 > bshow (Quote v) = B.cons '\'' $ bshow v
 > bshow (AntiQuote v) = B.cons ',' $ bshow v
+
+hPutLisp utility. hPutLisp h l = hPutStr h $ show l
+
+> hPutLisp :: Handle -> Value -> IO ()
+> hPutLisp h (Integer i) = hPutStr h $ show i
+> hPutLisp h (Rational r) = do hPutStr h $ show (numerator r)
+>                              hPutChar h '/'
+>                              hPutStr h $ show (denominator r)
+> hPutLisp h (Double d) = hPutStr h $ show d
+> hPutLisp h (Symbol s) = hPutStr h $ s
+> hPutLisp h (String s) = hPutStr h $ show s
+> hPutLisp h (List l) = do hPutChar h '('
+>                          mapM_ (\ l -> do hPutLisp h l
+>                                           hPutChar h ' ') l
+>                          hPutChar h ')'
+> hPutLisp h (Quote v) = do hPutChar h '\''
+>                           hPutLisp h v
+> hPutLisp h (AntiQuote v) = do hPutChar h ','
+>                               hPutLisp h v
+
 
 Parser for lisp values
 
@@ -119,12 +143,30 @@ Parser for lisp values
 >                  char '"'
 >                  return $ String x
 
+TODO: re-do lisp parsing using parser generator.
+      re-do maxima parsing the same way.
+      after this add support for lisp symbols like "1st", "+-123", "234+", ...
+
+parseSimplifiedNumber - parses only integers or rationals.
+
+> parseSimplifiedNumber :: Parser Value
+> parseSimplifiedNumber =
+>     do i <- integer
+>        ((do char '/'
+>             den <- many1 digit
+>             return $ Rational (read i % read den))
+>         <|>
+>         do return $ Integer $ read i)
+
+
 > parseExpr :: Parser Value
-> parseExpr = try parseRational
->         <|> try parseDouble
->         <|> try parseInteger
+> parseExpr = try parseSimplifiedNumber
+>         -- We currently don't parse strings & doubles for performance reasons
+>         --     try parseRational 
+>         -- <|> try parseDouble
+>         -- <|> try parseInteger
 >         <|> parseSymbol
->         <|> parseString
+>         -- <|> parseString
 >         <|> do char '('
 >                optional spaces
 >                l <- endBy parseExpr spaces

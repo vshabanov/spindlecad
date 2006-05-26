@@ -90,7 +90,9 @@ but for deflection calculation it's OK.
 
 Evaluation utilities.
 
-> substdL dl = substituteSpindleDeflectionsParams [("dL",dl)]
+> substdL dl = substituteSpindleDeflectionsParams [("dL",dl),
+>                                                  ("_cas_pi",Rational $ toRational pi)]
+>                                                  -- ^^^ somewhat dirty optimization
 
 > evald a = eval a :: Double
 
