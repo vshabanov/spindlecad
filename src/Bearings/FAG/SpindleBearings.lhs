@@ -117,10 +117,12 @@ Bearing description string parsing routines.
 >      weight <- num kilogram
 >      -- bearing code duplicated
 >      many1 anyChar
->      -- bearing drawing
+>      -- bearing drawing (pressure cone to the left)
 >      let drawing = upperPart `Over` mirrorX upperPart
->          upperPart = Circle NormalLine (p (0.*mm) ballY) ballR
+>          upperPart = -- ball
+>                      Circle NormalLine (p (0.*mm) ballY) ballR
 >                      `Over`
+>                      -- inner ring (clockwise)
 >                      filletLine [offset, ballY -. offset,
 >                                  b2, ballY -. offset, rs3,
 >                                  b2, bbore2, rsmin,
@@ -128,6 +130,7 @@ Bearing description string parsing routines.
 >                                  mb2, ballY -. offset, rs3,
 >                                  moffset, ballY -. offset]
 >                      `Over`
+>                      -- outer ring (counter-clockwise)
 >                      filletLine [offset, ballY +. offset,
 >                                  b2, ballY +. offset, rs3,
 >                                  b2, dD2, rsmin,
@@ -135,8 +138,10 @@ Bearing description string parsing routines.
 >                                  mb2, dDa2, rs3,
 >                                  0.*mm, dDa2]
 >                      `Over`
+>                      -- right side face
 >                      l b2 (ballY-.offset-.rs3) b2 (ballY+.offset+.rs3)
 >                      `Over`
+>                      -- left side face
 >                      l mb2 (ballY-.offset-.rs3) mb2 (dDa2+.rs3)
 >          ballR = (1/2).*(dDa -. (1/2).*(bbore+.dD))
 >          ballY = (1/4) .* (bbore+.dD)
