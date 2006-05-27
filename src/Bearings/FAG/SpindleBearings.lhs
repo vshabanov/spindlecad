@@ -35,6 +35,7 @@ List of FAG hi-precision spindle bearings and their parameters
 > import Data.List
 > import qualified Data.Map as Map
 > import qualified Bearings.FAG.SpindleBearingsCatalogue
+> import Drawing
 
 
 List of all bearings from catalogue
@@ -77,7 +78,7 @@ Bearing description string parsing routines.
 >      -- dimensions
 >      d <- num mm
 >      dD <- num mm
->      bwidth <- num mm
+>      b <- num mm
 >      rsmin <- num mm
 >      r1smin <- num mm
 >      -- abutment dimensions
@@ -116,6 +117,39 @@ Bearing description string parsing routines.
 >      weight <- num kilogram
 >      -- bearing code duplicated
 >      many1 anyChar
+>      -- bearing drawing
+>      let drawing = upperPart `Over` mirrorX upperPart
+>          upperPart = Circle NormalLine (p (0.*mm) ballY) ballR
+>                      `Over`
+>                      filletLine [offset, ballY -. offset,
+>                                  b2, ballY -. offset, rs3,
+>                                  b2, bbore2, rsmin,
+>                                  mb2, bbore2, rsmin,
+>                                  mb2, ballY -. offset, rs3,
+>                                  moffset, ballY -. offset]
+>                      `Over`
+>                      filletLine [offset, ballY +. offset,
+>                                  b2, ballY +. offset, rs3,
+>                                  b2, dD2, rsmin,
+>                                  mb2, dD2, r1smin,
+>                                  mb2, dDa2, rs3,
+>                                  0.*mm, dDa2]
+>                      `Over`
+>                      l b2 (ballY-.offset-.rs3) b2 (ballY+.offset+.rs3)
+>                      `Over`
+>                      l mb2 (ballY-.offset-.rs3) mb2 (dDa2+.rs3)
+>          ballR = (1/2).*(dDa -. (1/2).*(bbore+.dD))
+>          ballY = (1/4) .* (bbore+.dD)
+>          offset = sin (45*degree) .* ballR
+>          moffset = (-1).*offset
+>          p = Point
+>          b2 = (1/2).*b
+>          mb2 = (-1/2).*b
+>          bbore2 = (1/2).*bbore
+>          dD2 = (1/2).*dD
+>          dDa2 = (1/2).*dDa
+>          rs3 = (1/3).*rsmin
+>          l x1 y1 x2 y2 = Line NormalLine [(p x1 y1), (p x2 y2)]
 >      -- return the result bearing description
 >      return $ Bearing
 >                 { manufacturer = "FAG",
@@ -126,7 +160,7 @@ Bearing description string parsing routines.
 >                   contactAngle = cangl,
 >                   innerDiameter = bbore,
 >                   outerDiameter = dD,
->                   width = bwidth,
+>                   width = b,
 >                   attainableSpeedGrease = speedGrease,
 >                   attainableSpeedOil = speedOil,
 >                   radialRigidity = (if cangl == 15*degree then 6/2 else 2/2) .* sal,
@@ -134,7 +168,8 @@ Bearing description string parsing routines.
 >                   cdyn = cdyn,
 >                   c0stat = c0stat,
 >                   innerRingRadialRunout = innerRingRadialRunoutP4S bbore,
->                   outerRingRadialRunout = outerRingRadialRunoutP4S dD
+>                   outerRingRadialRunout = outerRingRadialRunoutP4S dD,
+>                   bearingDrawing = drawing
 >                 }
 
 > num :: Value a -> Parser (Value a)

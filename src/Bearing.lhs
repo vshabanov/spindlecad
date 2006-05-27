@@ -26,6 +26,7 @@ Bearing description data type
 > import TypeLevelPhysicalValue
 > import TypeLevelPhysicalUnitsList
 > import CASExpr
+> import Drawing
 
 Bearing data type.
 
@@ -62,7 +63,8 @@ For the moment we have simple all-in-one type.
 >                  cdyn :: Value Newton,  -- Cdyn   - dynamic load rating
 >                  c0stat :: Value Newton, -- C0stat - static load rating
 >                  innerRingRadialRunout :: Value Meter,
->                  outerRingRadialRunout :: Value Meter
+>                  outerRingRadialRunout :: Value Meter,
+>                  bearingDrawing :: Drawing
 >                }
 >     deriving (Eq, Ord, Show)
 
@@ -94,5 +96,6 @@ Bearing dimension series.
 >               cdyn = undefined,
 >               c0stat = undefined,
 >               innerRingRadialRunout = undefined,
->               outerRingRadialRunout = undefined
+>               outerRingRadialRunout = undefined,
+>               bearingDrawing = undefined
 >             }

@@ -24,13 +24,15 @@ Primitive 2D drawing description data type & simple exporting to ACAD lisp.
 >     Drawing(..),
 >     Point(..),
 >     LineStyle(..),
->     exportToACAD -- :: Drawing -> FilePath -> IO () / exportToACAD "file.lsp"
+>     exportToACAD, -- :: Drawing -> FilePath -> IO () / exportToACAD "file.lsp"
+>     mirrorX,
+>     filletLine
 >   ) where
 
 > import TypeLevelPhysicalDimension
 > import TypeLevelPhysicalValue
 > import TypeLevelPhysicalUnitsList
-> import CASExpr (eval)
+> import CASExpr (eval, inexactEq, inexactCompare)
 > import Lisp hiding (Value)
 > import qualified Lisp (Value)
 > import System.IO
@@ -60,12 +62,77 @@ i.e. no pixels - vector graphics only.
 >                  deriving (Eq, Ord, Show)
 
 
+Mirror drawing relative x-axis
+
+> mirrorX = mapDrawing (\ (x, y) -> (x, (-1).*y))
+>                      (\ (a1, a2) -> (-a2, -a1))
+
+Points mapping
+
+> mapDrawing :: ((Value Meter, Value Meter) -> (Value Meter, Value Meter)) ->
+>              ((Angle, Angle) -> (Angle, Angle)) ->
+>              Drawing -> Drawing
+> mapDrawing f a (Line ls p) = Line ls (map (liftPoint f) p)
+> mapDrawing f a (Spline ls p) = Spline ls (map (liftPoint f) p)
+> mapDrawing f a (Circle ls p r) = Circle ls (liftPoint f p) r
+> mapDrawing f a (Arc ls p r a1 a2) = let (a1',a2') = a (a1,a2) in
+>                                     Arc ls (liftPoint f p) r a1' a2'
+> mapDrawing f a (Over d1 d2) = Over (mapDrawing f a d1) (mapDrawing f a d2)
+
+> liftPoint f = (\ (Point x y) -> let (nx,ny) = f (x,y) in
+>                Point nx ny)
+
+Fillet line.
+
+> filletLine (x1:y1:x2:y2:r:x3:y3:xs) =
+>     let (l1,a,l2) = fillet (Line NormalLine [Point x1 y1, Point x2 y2])
+>                            (Line NormalLine [Point x2 y2, Point x3 y3])
+>                            NormalLine r
+>     --let (l1,l2) = (Line NormalLine [Point x1 y1, Point x2 y2],
+>     --               Line NormalLine [Point x2 y2, Point x3 y3])
+>         Line _ [Point xb yb, _] = l2
+>     in
+>       l1 `Over` a `Over` (if xs == [] then l2 else filletLine (xb:yb:x3:y3:xs))
+>
+
+fillet now works only for horizontal/vertical lines
+
+> fillet (Line ls1 [Point x1 y1, Point x2 y2])
+>        (Line ls2 [Point _  _ , Point x3 y3]) ls r =
+>            (Line ls1 [Point x1 y1, Point xa ya],
+>             Arc ls (if l1horiz then Point xa yb else Point xb ya) r
+>                    (a1*degree) (a2*degree),
+>             Line ls2 [Point xb yb, Point x3 y3])
+>     where xa = x2 -. (signum $ (x2-.x1)/.meter).*r
+>           ya = y2 -. (signum $ (y2-.y1)/.meter).*r
+>           xb = x2 +. (signum $ (x3-.x2)/.meter).*r
+>           yb = y2 +. (signum $ (y3-.y2)/.meter).*r
+>           l1horiz = inexactEq (y1/.meter) (y2/.meter)
+>           (>.) a b = inexactCompare (a/.meter) (b/.meter) == GT
+>           (a1, a2) = if l1horiz
+>                      then
+>                        if yb >. y1
+>                           then (if x2>.x1 then (-90,0) else (180,-90))
+>                           else (if x2>.x1 then (0,90) else (90,180))
+>                      else 
+>                        if xb >. x1
+>                           then (if y2>.y1 then (90,180) else (180,-90))
+>                           else (if y2>.y1 then (0,90) else (-90,0))
+
+
 AutoCAD lisp file exporting.
 
 > exportToACAD :: Drawing -> FilePath -> IO ()
 > exportToACAD d s = bracket (openFile s WriteMode) hClose $ \ h -> do
->     mapM_ (\ l -> hPutLisp h l >> hPutStrLn h "") layersSetup
->     mapM_ (\ l -> hPutLisp h l >> hPutStrLn h "") $ drawingCommands d
+>     let putCommands = mapM_ (\ l -> hPutLisp h l >> hPutStrLn h "")
+>     putCommands layersSetup
+>     -- turn off all snapping, since we draw precisely
+>     putCommands [scommand "orthomode" ["0"],
+>                  scommand "polarmode" ["0"],
+>                  scommand "snapmode" ["0"],
+>                  scommand "osnap" [""]]
+>     putCommands $ drawingCommands d
+>     
 
 
 Call AutoCAD command:
@@ -126,8 +193,8 @@ Circle:
 (command "circle" '(0 0) 100)
 
 Arc:
-(command "ellipse" "a" '(x (y+r)) '(x (y-r)) '((x+r) y)
-                        (startAngle-90) (endAngle-90))
+(command "arc" "c" `(x y) `(x+r*sin(a1) y+r*cos(a1))
+                          `(x+r*sin(a2) y+r*cos(a2)))
 
 Drawing to commands list conversion.
 
@@ -141,12 +208,10 @@ Drawing to commands list conversion.
 >                                    command "circle" [point c, value r]]
 > drawingCommands (Arc ls (Point x y) r a1 a2) =
 >     [lineStyle ls,
->      command "ellipse" [String "a",
->                         point (Point x (y +. r)),
->                         point (Point x (y -. r)),
->                         point (Point (x +. r) y),
->                         angle (a1 - 90*degree),
->                         angle (a2 - 90*degree)]]
+>      command "arc" [String "c",
+>                     point (Point x y),
+>                     point (Point (x+.cos a1.*r) (y+.sin a1.*r)),
+>                     point (Point (x+.cos a2.*r) (y+.sin a2.*r))]]
 > drawingCommands (Over d1 d2 ) =
 >     drawingCommands d2
 >     ++
