@@ -45,6 +45,7 @@ Drawing data type.
 >              | Spline LineStyle [Point]
 >              | Circle LineStyle Point (Value Meter)
 >              | Arc LineStyle Point (Value Meter) Angle Angle
+>              | Text Point String -- simple centered multi-line text
 >              | Over Drawing Drawing
 >                deriving (Eq, Ord, Show)
 
@@ -61,6 +62,9 @@ i.e. no pixels - vector graphics only.
 >                | HiddenLine
 >                  deriving (Eq, Ord, Show)
 
+Text utility
+
+> centeredText x y s = Text (Point x y) s
 
 Mirror drawing relative x-axis
 
@@ -77,6 +81,7 @@ Points mapping
 > mapDrawing f a (Circle ls p r) = Circle ls (liftPoint f p) r
 > mapDrawing f a (Arc ls p r a1 a2) = let (a1',a2') = a (a1,a2) in
 >                                     Arc ls (liftPoint f p) r a1' a2'
+> mapDrawing f a (Text p s) = Text (liftPoint f p) s
 > mapDrawing f a (Over d1 d2) = Over (mapDrawing f a d1) (mapDrawing f a d2)
 
 > liftPoint f = (\ (Point x y) -> let (nx,ny) = f (x,y) in
@@ -212,6 +217,16 @@ Drawing to commands list conversion.
 >                     point (Point x y),
 >                     point (Point (x+.cos a1.*r) (y+.sin a1.*r)),
 >                     point (Point (x+.cos a2.*r) (y+.sin a2.*r))]]
+> drawingCommands (Text p s) =
+>     [command "mtext" ([point p,
+>                        String "j",
+>                        String "MC", -- middle-center justification
+>                        point p] -- same center point
+>                       ++
+>                       map (\ l -> String (if l == "" then " " else l))
+>                         (lines s)
+>                       ++
+>                       [String ""])]
 > drawingCommands (Over d1 d2 ) =
 >     drawingCommands d2
 >     ++
