@@ -25,14 +25,17 @@ Primitive 2D drawing description data type & simple exporting to ACAD lisp.
 >     Point(..),
 >     LineStyle(..),
 >     exportToACAD, -- :: Drawing -> FilePath -> IO () / exportToACAD "file.lsp"
->     mirrorX,
+>     mirrorX, mirrorY,
+>     move, over,
+>     changeLineStyleTo,
+>     substituteDrawing,
 >     filletLine
 >   ) where
 
 > import TypeLevelPhysicalDimension
 > import TypeLevelPhysicalValue
 > import TypeLevelPhysicalUnitsList
-> import CASExpr (eval, inexactEq, inexactCompare)
+> import CASExpr (eval, substitute, inexactEq, inexactCompare)
 > import Lisp hiding (Value)
 > import qualified Lisp (Value)
 > import System.IO
@@ -41,7 +44,8 @@ Primitive 2D drawing description data type & simple exporting to ACAD lisp.
 
 Drawing data type.
 
-> data Drawing = Line LineStyle [Point]
+> data Drawing = EmptyDrawing
+>              | Line LineStyle [Point]
 >              | Spline LineStyle [Point]
 >              | Circle LineStyle Point (Value Meter)
 >              | Arc LineStyle Point (Value Meter) Angle Angle
@@ -62,30 +66,85 @@ i.e. no pixels - vector graphics only.
 >                | HiddenLine
 >                  deriving (Eq, Ord, Show)
 
+Drawing editing
+
+> data Editor = Editor { pointMap :: (Value Meter, Value Meter)
+>                                 -> (Value Meter, Value Meter),
+>                        arcAnglesMap :: (Angle, Angle) -> (Angle, Angle),
+>                        lineStyleMap :: LineStyle -> LineStyle 
+>                      }
+
+> defaultEditor = Editor { pointMap = id,
+>                          arcAnglesMap = id,
+>                          lineStyleMap = id 
+>                        }
+
 Text utility
 
 > centeredText x y s = Text (Point x y) s
 
-Mirror drawing relative x-axis
+Mirror drawing relative x-axis, y-axis
 
-> mirrorX = mapDrawing (\ (x, y) -> (x, (-1).*y))
->                      (\ (a1, a2) -> (-a2, -a1))
+> mirrorX = mapDrawing (defaultEditor
+>                       { pointMap = (\ (x, y) -> (x, (-1).*y)),
+>                         arcAnglesMap = (\ (a1, a2) -> (-a2, -a1)) 
+>                       })
 
-Points mapping
+> mirrorY = mapDrawing (defaultEditor
+>                       { pointMap = (\ (x, y) -> ((-1).*x, y)),
+>                         arcAnglesMap = (\ (a1, a2) -> (pi-a2, pi-a1))
+>                       })
 
-> mapDrawing :: ((Value Meter, Value Meter) -> (Value Meter, Value Meter)) ->
->              ((Angle, Angle) -> (Angle, Angle)) ->
->              Drawing -> Drawing
-> mapDrawing f a (Line ls p) = Line ls (map (liftPoint f) p)
-> mapDrawing f a (Spline ls p) = Spline ls (map (liftPoint f) p)
-> mapDrawing f a (Circle ls p r) = Circle ls (liftPoint f p) r
-> mapDrawing f a (Arc ls p r a1 a2) = let (a1',a2') = a (a1,a2) in
->                                     Arc ls (liftPoint f p) r a1' a2'
-> mapDrawing f a (Text p s) = Text (liftPoint f p) s
-> mapDrawing f a (Over d1 d2) = Over (mapDrawing f a d1) (mapDrawing f a d2)
+Drawing moving
 
-> liftPoint f = (\ (Point x y) -> let (nx,ny) = f (x,y) in
->                Point nx ny)
+> move dx dy = mapDrawing (defaultEditor
+>                          { pointMap = (\ (x, y) -> (x+.dx, y+.dy))
+>                          })
+
+`over` utility - the same as Over constructor but ignores EmptyDrawing
+
+> EmptyDrawing `over` EmptyDrawing = EmptyDrawing
+> EmptyDrawing `over` d            = d
+> d            `over` EmptyDrawing = d
+> d1           `over` d2           = d1 `Over` d2
+
+> infixl 6  `over` -- same fixity as +
+
+Line style changing
+
+> changeLineStyleTo l = mapDrawing (defaultEditor { lineStyleMap = (\ _ -> l) 
+>                                                 })
+
+Substituting of symbols which can appear in drawing description
+
+> substituteDrawing m =
+>     mapDrawing (Editor { pointMap = (\ (x,y) ->(s x, s y)),
+>                          arcAnglesMap  = (\ (a1,a2) ->(sa a1, sa a2)),
+>                          lineStyleMap = id 
+>                        })
+>     where s = substitutepv m
+>           sa = substitute m
+
+Drawing mapping
+
+> mapDrawing :: Editor -> Drawing -> Drawing
+> mapDrawing e d = mapd d
+>     where mapd EmptyDrawing = EmptyDrawing
+>           mapd (Line ls p) = Line (l ls) (points p)
+>           mapd (Spline ls p) = Spline (l ls) (points p)
+>           mapd (Circle ls p r) = Circle (l ls) (point p) r
+>           mapd (Arc ls p r a1 a2) =
+>               let (a1',a2') = (arcAnglesMap e) (a1,a2) in
+>               Arc (l ls) (point p) r a1' a2'
+>           mapd (Text p s) = Text (point p) s
+>           mapd (Over d1 d2) = Over (mapd d1) (mapd d2)
+>
+>           l = lineStyleMap e
+>           points = map (liftPoint (pointMap e))
+>           point = liftPoint (pointMap e)
+>           liftPoint f = (\ (Point x y) -> let (nx,ny) = f (x,y) in
+>                          Point nx ny)
+
 
 Fillet line.
 

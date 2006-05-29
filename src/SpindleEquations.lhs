@@ -40,6 +40,7 @@ system of equations that describes particular spindle.
 > import Text.Printf
 > import qualified Data.Map as Map
 > import ExactNumber
+> import Drawing
 
 
 Spindle description data type.
@@ -48,6 +49,7 @@ Spindle description data type.
 > data Section = Section { momentOfInertia :: Value Meter4,
 >                          material :: Material,
 >                          sectionLength :: Value Meter,
+>                          sectionDrawing :: Drawing,
 >                          forces :: Map.Map (Value Meter) Force,
 >                          bearings :: Map.Map (Value Meter) Bearing 
 >                        }
@@ -67,6 +69,12 @@ Cylindrical section description.
 > cylinder d l = [Section { momentOfInertia = jCircle d,
 >                           material = steel,
 >                           sectionLength = l,
+>                           sectionDrawing =
+>                             Line NormalLine [Point (0.*mm) ((1/2).*d),
+>                                              Point l ((1/2).*d),
+>                                              Point l ((-1/2).*d),
+>                                              Point (0.*mm) ((-1/2).*d),
+>                                              Point (0.*mm) ((1/2).*d)],
 >                           forces = Map.empty,
 >                           bearings = Map.empty 
 >                         }]
@@ -123,12 +131,17 @@ Sequential spindle connection.
 
 Spindle bore description. The bore is just another spindle of equal length
 which is cut from base spindle.
+The cut part is drawn using HiddenLine.
 
 > cut :: Spindle -> Spindle -> Spindle
 > cut = unionSpindles cutSection
 >     where cutSection base bore =
 >               base { momentOfInertia =
->                      momentOfInertia base -. momentOfInertia bore }
+>                      momentOfInertia base -. momentOfInertia bore,
+>                      sectionDrawing = sectionDrawing base `over`
+>                                       changeLineStyleTo HiddenLine 
+>                                         (sectionDrawing bore)
+>                    }
 
 Makes spindle shaft rigidity millon times greater than those steel,
 i.e. makes shaft practically absolutely rigid.
@@ -145,7 +158,7 @@ can give more precice bearing deflection than absolutely rigid shaft.
 Fixities for construction functions and operators
 
 > infixl 6 `at`                 -- same fixity as +
-> infixr 6 <+>                  -- same fixity as +
+> infixr 6 <+>                  -- same fixity as +, but right associative
 > infixl 5 `addRadialForce`     -- same fixity as ++, but left associative
 > infixl 5 `addBendingMoment`   -- same fixity as ++, but left associative
 > infixl 5 `addBearing`         -- same fixity as ++, but left associative
@@ -194,6 +207,7 @@ where a = sectionUnion 1 (fst (splitSection 1' (length 1)))
 
 
 splitSection splits section at specified coordinate.
+sectionDrawing is left in the left section
 
 > splitSection :: Section -> Value Meter -> (Section, Section)
 > splitSection s l =
@@ -203,9 +217,10 @@ splitSection splits section at specified coordinate.
 >                  forces = Map.filterWithKey   (\ k _ -> k <= l) $ forces s,
 >                  bearings = Map.filterWithKey (\ k _ -> k <= l) $ bearings s
 >                },
->              s { momentOfInertia = substitutepv [("x", Symbol "x" + l/.meter)]
+>              s { momentOfInertia = substitutepv' [("x", Symbol "x" + l/.meter)]
 >                    (momentOfInertia s),
 >                  sectionLength = sectionLength s -. l,
+>                  sectionDrawing = EmptyDrawing,
 >                  forces =   Map.mapKeys (\ k -> k -. l) $
 >                    Map.filterWithKey (\ k _ -> k > l) $ forces s,
 >                  bearings = Map.mapKeys (\ k -> k -. l) $
@@ -214,11 +229,6 @@ splitSection splits section at specified coordinate.
 
 
 Querying properties of described spindle.
-
-... deflectionLine sp -> [(x,y)]
-... reactions sp -> [(x,bearing,r)]
-... deflectionOf spindleDecr `at` 0
-
 
 To get the properties of spindle we first need to solve equation system
 corresponding to concrete spindle description.
@@ -374,7 +384,7 @@ i.e. A0...A3 become (prefix++A0...) and all reactions become prefixR1,2,...
 >         (toList $ forces section) (toList $ bearings section))
 >     where desc = (prefix,
 >                   modulusOfElasticity (material section), -- E
->                   substitutepv [("x", Symbol (prefix++"x"))] $
+>                   substitutepv' [("x", Symbol (prefix++"x"))] $
 >                       momentOfInertia section) -- J
 >           toList = map (\(c, a) -> (c, a)) . Map.toList
 >                      -- we convert coordinates to undimensioned CASExpr
@@ -403,7 +413,7 @@ i.e. A0...A3 become (prefix++A0...) and all reactions become prefixR1,2,...
 
 > getSectionDeflection :: SectionDeflections -> Value Meter -> Value Meter
 > getSectionDeflection (prefix, sd) c =
->     substitutepv [(prefix++"x", c/.meter)] $ leftmost sd c
+>     substitutepv' [(prefix++"x", c/.meter)] $ leftmost sd c
 
 > type SpindleDeflections = [(Value Meter, (Section, SectionDeflections))]
 
@@ -508,18 +518,36 @@ Solving of spindle equation system using Maxima.
 > substituteSpindleDeflectionsParams :: [(String, CASExpr)]
 >                                    -> SpindleDeflections -> SpindleDeflections
 > substituteSpindleDeflectionsParams kvl sd =
->     let subst = substitutepv kvl in
+>     let m = Map.fromList kvl
+>         subst = substitutepv m
+>         substd = substituteDrawing m in
 >     map (\ (l, (s, (p, secd))) ->
 >          (subst l,
->           (s { sectionLength = subst $ sectionLength s 
+>           (s { momentOfInertia = subst $ momentOfInertia s,
+>                sectionLength = subst $ sectionLength s,
+>                sectionDrawing = substd $ sectionDrawing s,
+>                forces = Map.map
+>                  (\ f -> Force { radialForce = subst $ radialForce f,
+>                                  bendingMoment = subst $ bendingMoment f 
+>                                }) $ forces s
 >              },
 >            (p,
 >             map (\ (l,d) -> (subst l, subst d)) secd))))
 >     sd
 
-TODO: ^ actually we also must substitute section lengthes, diameters, etc.
-
 General utilities.
+
+> spindleDrawing :: Spindle -> Drawing
+> spindleDrawing s = d (0.*mm) s
+>     where d l [] = EmptyDrawing
+>           d l (s:xs) =
+>               (move l (0.*mm) $ sectionDrawing s)
+>               `over`
+>               (foldl over EmptyDrawing $
+>                map (\ (p, b) -> move (l+.p) (0.*mm) $ bearingDrawing b) $
+>                Map.toAscList $ bearings s)
+>               `over`
+>               d (l +. sectionLength s) xs
 
 Leftmost value from section list.
 Section list is a list of length-value pairs.
@@ -551,11 +579,6 @@ Area of circle.
 
 > areaOfCircle :: Value Meter -> Value Meter2
 > areaOfCircle d = (pi/4) .* square d
-
-substitutepv - same as CASExpr.substitute but for physical values
-
-> substitutepv :: [(String, CASExpr)] -> Value a -> Value a
-> substitutepv s (Value v) = Value (substitute (Map.fromList s) v)
 
 --------------------------------------------------------------------------------
 

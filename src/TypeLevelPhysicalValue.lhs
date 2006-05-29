@@ -28,6 +28,7 @@ Type level representation of physical values.
 > import TypeLevelPhysicalDimension
 > import TypeLevelInteger -- Zero
 > import TypeLevelBoolean -- BTrue, BFalse
+> import qualified Data.Map as Map
 > import CASExpr
 
 
@@ -145,6 +146,19 @@ Here they are:
 > (./) :: (DimensionDivide NonDim d2 d)
 >         => CASExpr -> Value d2 -> Value d
 > a ./ Value b = Value (a / b)
+
+
+Substitution of symbols found in value.
+substitutepv - same as CASExpr.substitute but for physical values
+
+> substitutepv :: Map.Map String CASExpr -> Value a -> Value a
+> substitutepv m (Value v) = Value (substitute m v)
+
+simplified interface
+
+> substitutepv' :: [(String, CASExpr)] -> Value a -> Value a
+> substitutepv' s = let m = Map.fromList s in
+>                   (\ (Value v) -> Value (substitute m v))
 
 
 Value simplification. It converts nondimensional argument to Double and

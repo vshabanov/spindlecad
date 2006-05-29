@@ -35,6 +35,7 @@ This module is temporary. Its used for manual course work spindle optimization.
 > import SpindleEquations
 > import Text.Printf
 > import Drawing
+> import qualified Data.Map as Map
 
 The spindle of machine tool used in course work.
 Console force of 1N and five FAG bearings.
@@ -44,6 +45,8 @@ but for deflection calculation it's OK.
 > for fun pred l f = mapM_ f (filter (fun `is` pred) l)
 
 > main = withInterpreter $ \i -> do
+>     exportToACAD (substituteDrawing (Map.fromList [("dL",0)]) $
+>                   spindleDrawing testSpindle) "C:/base-spindle.lsp"
 >     let sd = substpi $ spindleDeflections testSpindle
 >     --print sd
 >     --print $ spindleEquationSystem sd
@@ -62,7 +65,7 @@ but for deflection calculation it's OK.
 >         -- dLopt <- Maxima.eval i $ solve [diff sd0 "dL" `Equal` 0] ["dL"]
 >         -- diff sd0 has dL^6,dL^5, etc. maxima can only solve x^4...=0         
 >         let (sd0opt, dLopt) = minimum $
->                               map (\ dl -> (abs $ eval $ substitutepv [("dL",dl/1000)] sd0
+>                               map (\ dl -> (abs $ eval $ substitutepv' [("dL",dl/1000)] sd0
 >                                             /. nano meter :: Double, dl/1000)) [-40..200]
 >         let s = substdL 0 sd
 >         let sopt = substdL dLopt sd
