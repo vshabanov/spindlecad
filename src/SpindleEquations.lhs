@@ -46,18 +46,30 @@ system of equations that describes particular spindle.
 Spindle description data type.
 
 > type Spindle = [Section]
+>     
 > data Section = Section { momentOfInertia :: Value Meter4,
 >                          material :: Material,
 >                          sectionLength :: Value Meter,
 >                          sectionDrawing :: Drawing,
 >                          forces :: Map.Map (Value Meter) Force,
->                          bearings :: Map.Map (Value Meter) Bearing 
+>                          bearings :: Map.Map (Value Meter)
+>                                              (MountScheme, Bearing)
 >                        }
 >                deriving (Eq, Ord, Show)
+>                         
 > data Force = Force { radialForce :: Value Newton,
 >                      bendingMoment :: Value NewtonMulMeter 
 >                    }
 >              deriving (Eq, Ord, Show)
+>                       
+> data MountScheme = MountScheme { mountDirection :: MountDirection,
+>                                  innerRingRadialRunoutCoefficient :: CASExpr
+>                                }
+>                    deriving (Eq, Ord, Show)
+>
+> data MountDirection = MountLeft
+>                     | MountRight
+>                       deriving (Eq, Ord, Show)
 
 
 Spindle construction functions.
@@ -94,6 +106,15 @@ Therefore `cone` is now commented.
  >                           bearings = Map.empty 
  >                         }]
 
+Spindle description modification.
+Usage: spindle `modify` addSomething ... `at` ... .* mm
+               ...
+               `modify` addSomething ... `at` ... .* mm 
+
+> modify :: Spindle -> ((Section -> Value Meter -> Section), Value Meter)
+>        -> Spindle
+> modify s (f, c) = modifySectionAt f s c
+
 Something `at` specified coordinate description.
 
 > at :: a -> Value Meter -> (a, Value Meter)
@@ -101,8 +122,8 @@ Something `at` specified coordinate description.
 
 Radial force description.
 
-> addRadialForce :: Spindle -> (Value Newton, Value Meter) -> Spindle
-> addRadialForce sp (force, c) = modifySectionAt addrf sp c
+> addRadialForce :: Value Newton -> (Section -> Value Meter -> Section)
+> addRadialForce force = addrf
 >     where addrf s c = s { forces = Map.insert c
 >                           (Force { radialForce = force,
 >                                    bendingMoment = 0 .* newton *. meter })
@@ -110,8 +131,9 @@ Radial force description.
 
 Bending moment description.
 
-> addBendingMoment :: Spindle -> (Value NewtonMulMeter, Value Meter) -> Spindle
-> addBendingMoment sp (moment, c) = modifySectionAt addbm sp c
+> addBendingMoment :: Value NewtonMulMeter
+>                  -> (Section -> Value Meter -> Section)
+> addBendingMoment moment = addbm
 >     where addbm s c = s { forces = Map.insert c
 >                           (Force { radialForce = 0 .* newton,
 >                                    bendingMoment = moment })
@@ -119,10 +141,26 @@ Bending moment description.
 
 Bearing description.
 
-> addBearing :: Spindle -> (Bearing, Value Meter) -> Spindle
-> addBearing sp (bearing, c) = modifySectionAt addb sp c
+> defaultMountScheme = MountScheme { mountDirection = MountLeft,
+>                                    innerRingRadialRunoutCoefficient = 0 
+>                                  }
+
+> addBearing :: Bearing -> (Section -> Value Meter -> Section)
+> addBearing bearing = addb
 >     where addb s c =
->               s { bearings = Map.insert c bearing (bearings s) }
+>               s { bearings = Map.insert c (defaultMountScheme, bearing)
+>                              (bearings s) }
+
+> addBearing' :: Bearing -> MountDirection -> CASExpr
+>             -> (Section -> Value Meter -> Section)
+> addBearing' bearing md irrrc = addb
+>     where addb s c =
+>               s { bearings = Map.insert c
+>                   (MountScheme { mountDirection = md,
+>                                  innerRingRadialRunoutCoefficient = irrrc
+>                                },
+>                    bearing)
+>                   (bearings s) }
 
 Sequential spindle connection.
 
@@ -159,10 +197,8 @@ Fixities for construction functions and operators
 
 > infixl 6 `at`                 -- same fixity as +
 > infixr 6 <+>                  -- same fixity as +, but right associative
-> infixl 5 `addRadialForce`     -- same fixity as ++, but left associative
-> infixl 5 `addBendingMoment`   -- same fixity as ++, but left associative
-> infixl 5 `addBearing`         -- same fixity as ++, but left associative
-> infixl 5 `cut`                -- same fixity as ++
+> infixl 5 `cut`                -- same fixity as ++, but left associative
+> infixl 5 `modify`             -- same fixity as ++, but left associative
 
 
 Spindle construction functions utilities.
@@ -354,12 +390,12 @@ Connected sections.
 >           diffn' a = diffn (a/.(newton*.meter3))
 
 Radial bearing
-    y = R/j
+    y = R/j + runout
 
 > radialBearing :: Desc -> Value Meter -> Value Newton -> Value NewtonDivMeter
->                  -> Value Meter -> [CASExpr]
-> radialBearing desc coordinate r j rhs =
->     [(r /. j) /. meter
+>                  -> Value Meter -> Value Meter -> [CASExpr]
+> radialBearing desc coordinate r j runout rhs =
+>     [(r /. j +. runout) /. meter
 >      `Equal` subst [(x, coordinate /. meter)] (rhs/.meter)]
 >     where x = prefix desc ++ "x"
 
@@ -443,10 +479,10 @@ i.e. A0...A3 become (prefix++A0...) and all reactions become prefixR1,2,...
 > getBearingReactions sd = br (0.*mm) sd
 >     where br l [] = []
 >           br l ((len, (sec, defls)):xs) =
->               map (\ (pos, b) -> (b, l+.pos,
->                                   -- R=y*j
->                                   getSectionDeflection defls pos *.
->                                   radialRigidity b))
+>               map (\ (pos, (ms,b)) -> (b, l+.pos,
+>                                        -- R=y*j
+>                                        getSectionDeflection defls pos *.
+>                                        radialRigidity b))
 >                       (Map.toAscList $ bearings sec)
 >               ++
 >               br (l +. len) xs
@@ -467,10 +503,13 @@ The equation system.
 >              momentOfInertia section)
 >             
 >         sectionBoundaryConditions s@(l, (sec, (prefix, sd))) = concat $
->             map (\ ((c, bearing), bn) ->
+>             map (\ ((c, (mountScheme, bearing)), bn) ->
 >                  radialBearing (desc s) c
 >                    (Symbol (prefix ++ "R" ++ show bn) .* newton)
->                    (radialRigidity bearing) (rightmost sd c))
+>                    (radialRigidity bearing)
+>                    (innerRingRadialRunoutCoefficient mountScheme .*
+>                     innerRingRadialRunout bearing)
+>                    (rightmost sd c))
 >                 $ zipWith (,) (Map.toList $ bearings sec) [1..]
 >                   
 >         equationSystem s [] = sectionBoundaryConditions s ++
@@ -544,7 +583,10 @@ General utilities.
 >               (move l (0.*mm) $ sectionDrawing s)
 >               `over`
 >               (foldl over EmptyDrawing $
->                map (\ (p, b) -> move (l+.p) (0.*mm) $ bearingDrawing b) $
+>                map (\ (p, (ms, b)) -> move (l+.p) (0.*mm) $
+>                     if mountDirection ms == MountLeft
+>                       then bearingDrawing b
+>                       else mirrorY $ bearingDrawing b) $
 >                Map.toAscList $ bearings s)
 >               `over`
 >               d (l +. sectionLength s) xs
@@ -619,8 +661,8 @@ Parameters:
 >         s2 = s1 +. partialSolutionRadialForce desc r2 (a+.b)
 >     let eqlist = (freeEnd desc c s ++
 >                   freeEnd desc (a+.b) s2 ++
->                   radialBearing desc b r1 j s1 ++
->                   radialBearing desc (a+.b) r2 j s2)
+>                   radialBearing desc b r1 j (0.*mm) s1 ++
+>                   radialBearing desc (a+.b) r2 j (0.*mm) s2)
 >     r <- eval i $ solve eqlist ["A0", "A1", "A2", "A3", "R1", "R2"]
 >     let List [a] = r
 >     y0 <- eval i $ Funcall CFSubst [a, sf/.meter]
@@ -655,8 +697,8 @@ The same as testCase1 but spindle is splitted in two sections.
 >     let eqlist = (freeEnd desc1 c s1 ++
 >                   freeEnd desc2 (0.5.*(a+.b)) s22 ++
 >                   connected desc1 s11 (500.*mm) desc2 s2 ++
->                   radialBearing desc1 b r1 j s11 ++
->                   radialBearing desc2 (0.5.*a) r2 j s22)
+>                   radialBearing desc1 b r1 j (0.*mm) s11 ++
+>                   radialBearing desc2 (0.5.*a) r2 j (0.*mm) s22)
 >     r <- eval i $ solve eqlist ["s1A0", "s1A1", "s1A2", "s1A3",
 >                                 "s2A0", "s2A1", "s2A2", "s2A3",
 >                                 "R1", "R2"]

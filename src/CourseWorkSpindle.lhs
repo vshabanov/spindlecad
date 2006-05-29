@@ -52,13 +52,16 @@ but for deflection calculation it's OK.
 >     --print $ spindleEquationSystem sd
 >     baseSsd <- solveSpindleDeflections i sd
 >     let baseS = substdL 0 baseSsd
+>     exportToACAD (deflectionLine (10 .* mm /. nano meter) baseS)
+>                  "C:/base-spindle-deflections.lsp"
 >     --print baseS
 >     let baseLife = minimum $ map (\ (b, p, n) -> abs $ eval $ cdyn b /. n)
 >                    (getBearingReactions baseS)
 >         baseRigidity = rigidity baseS
->     for innerDiameter (>= 75.*mm) std15 $ \ b1 -> do
->       for innerDiameter (== 60.*mm) std15 $ \ b2 -> do
->         --let b2 = findBearingByCode "B7012C.T.P4S"
+>     for innerDiameter (>= 75.*mm) [findBearingByCode "B7015C.T.P4S"] $ \ b1 -> do
+>     --for innerDiameter (>= 75.*mm) std15 $ \ b1 -> do
+>       --for innerDiameter (== 60.*mm) std15 $ \ b2 -> do
+>         let b2 = findBearingByCode "B7012C.T.P4S"
 >         sd <- solveSpindleDeflections i
 >               (substpi $ spindleDeflections $ testSpindleConstructor b1 b2)
 >         let sd0 = getSpindleDeflection sd (0.*mm)
@@ -158,13 +161,9 @@ Spindle description construction.
 
 > testSpindleConstructor b1 b2 =
 >     -- shaft
->     --makeRigid
->     modifySectionAt (\ s _ -> s { sectionLength = sectionLength s
->                                   +. Symbol "dL" .* meter 
->                                 })
 >     (((cyl 82 13 <+> cyl 133 23 <+> cyl 120 8
 >       -- <+> cyl (innerDiameter b1 /. mm) (147.5+3*wd1)
->       <+> cyl (innerDiameter b1 /. mm) 100
+>       <+> cyl (innerDiameter b1 /. mm) (100)
 >       <+> cyl (innerDiameter b1 /. mm) (47.5+3*wd1) -- dL here
 >       <+> cyl 67 90
 >       <+> cyl (innerDiameter b2 /. mm) (62.5+2*wd2)
@@ -172,16 +171,20 @@ Spindle description construction.
 >      `cut`
 >      (cyl 55 30 <+> cyl 45 73 <+> cyl 35 (337+3*wd1+2*wd2)))
 >     -- forces
->     `addRadialForce` 1.*newton `at` 0.*mm
->     --`addBendingMoment` (0.2.*newton*.meter) `at` 1.*mm
+>     `modify` addRadialForce (1.*newton) `at` 0.*mm
+>     --`modify` addBendingMoment (0.5.*newton*.meter) `at` 1.*mm
 >     -- front bearing set
->     `addBearing` b1 `at` (44+27+0.5*wd1).*mm
->     `addBearing` b1 `at` (44+47+1.5*wd1).*mm
->     `addBearing` b1 `at` (44+79+2.5*wd1).*mm
+>     `modify` addBearing' b1 MountLeft  0 `at` (44+27+0.5*wd1).*mm
+>     `modify` addBearing' b1 MountLeft  0 `at` (44+47+1.5*wd1).*mm
+>     `modify` addBearing' b1 MountRight 0 `at` (44+79+2.5*wd1).*mm
 >     -- rear bearing set
->     `addBearing` b2 `at` (281.5+31+3*wd1+0.5*wd2).*mm
->     `addBearing` b2 `at` (281.5+49+3*wd1+1.5*wd2).*mm)
->     ((44+100 + 1).*mm) -- coordinate of section where dL is added to length
+>     `modify` addBearing' b2 MountLeft  0 `at` (281.5+31+3*wd1+0.5*wd2).*mm
+>     `modify` addBearing' b2 MountRight 0 `at` (281.5+49+3*wd1+1.5*wd2).*mm)
+>     -- section where dL is added to length
+>     `modify` (\ s _ -> s { sectionLength = sectionLength s
+>                                   +. Symbol "dL" .* meter 
+>                                 })
+>              `at` ((44+100 + 1).*mm) 
 >     -- end
 >   where cyl d l = cylinder (d.*mm) (l.*mm)
 >         wd1 = (width b1 -. width fagB7015C) /. mm
