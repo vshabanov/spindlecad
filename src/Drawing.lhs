@@ -26,7 +26,8 @@ Primitive 2D drawing description data type & simple exporting to ACAD lisp.
 >     LineStyle(..),
 >     exportToACAD, -- :: Drawing -> FilePath -> IO () / exportToACAD "file.lsp"
 >     mirrorX, mirrorY,
->     move, over,
+>     centeredText,
+>     move, over, scale,
 >     changeLineStyleTo,
 >     substituteDrawing,
 >     filletLine
@@ -99,6 +100,12 @@ Drawing moving
 
 > move dx dy = mapDrawing (defaultEditor
 >                          { pointMap = (\ (x, y) -> (x+.dx, y+.dy))
+>                          })
+
+Drawing scaling
+
+> scale kx ky = mapDrawing (defaultEditor
+>                          { pointMap = (\ (x, y) -> (kx.*x, ky.*y))
 >                          })
 
 `over` utility - the same as Over constructor but ignores EmptyDrawing

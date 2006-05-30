@@ -35,6 +35,7 @@ This module is temporary. Its used for manual course work spindle optimization.
 > import SpindleEquations
 > import Text.Printf
 > import Drawing
+> import Data.IORef
 > import qualified Data.Map as Map
 
 The spindle of machine tool used in course work.
@@ -44,26 +45,56 @@ but for deflection calculation it's OK.
 
 > for fun pred l f = mapM_ f (filter (fun `is` pred) l)
 
-> main = withInterpreter $ \i -> do
->     exportToACAD (substituteDrawing (Map.fromList [("dL",0)]) $
->                   spindleDrawing testSpindle) "C:/base-spindle.lsp"
+> main = drawRunouts
+
+> drawBaseSpindle = withInterpreter $ \i -> do
 >     let sd = substpi $ spindleDeflections testSpindle
->     --print sd
->     --print $ spindleEquationSystem sd
 >     baseSsd <- solveSpindleDeflections i sd
 >     let baseS = substdL 0 baseSsd
+>     exportToACAD (substituteDrawing (Map.fromList [("dL",0)]) $
+>                   spindleDrawing testSpindle) "C:/base-spindle.lsp"
 >     exportToACAD (deflectionLine (10 .* mm /. nano meter) baseS)
 >                  "C:/base-spindle-deflections.lsp"
->     --print baseS
+
+> drawRunouts = withInterpreter $ \i -> do
+>     let scaleDrawing = scale (1/5) (cm /. 2.5 .* micro meter)
+>         runoutsSpacing = 2.5 .* cm
+>         b1 = findBearingByCode "B7015C.T.P4S"
+>         b2 = findBearingByCode "B7012C.T.P4S"
+>     drawing <- newIORef EmptyDrawing
+>     -- scan 16 runout schemes & accumulate its drawings in `drawing` IORef
+>     flip mapM_ [(n,[1,a,b,c,d])
+>                 | n <- [0..]
+>                 | a <- [1,-1], b <- [1,-1],
+>                   c <- [1,-1], d <- [1,-1]] $ \ (n,ro) -> do
+>       let spindle = testSpindleConstructor 0 b1 b2 (map (* 0.5) ro)
+>       sd <- solveSpindleDeflections i
+>             (substdL 0 $ substpi $ spindleDeflections $ spindle)
+>       modifyIORef drawing
+>         (\ d -> (move (0.*mm) ((-n).*runoutsSpacing) $
+>                  centeredText ((-2).*cm) (0.*mm) (printf "%.3f" $ deflection sd / 1000)
+>                  `over`
+>                  scaleDrawing (deflectionLine 1 sd `over` runoutsScheme spindle))
+>                 `over`
+>                 d)
+>       print (n,ro)
+>     -- export the drawing
+>     finalDrawing <- readIORef drawing
+>     exportToACAD finalDrawing "c:/runouts.lsp"
+
+> scanBearings = withInterpreter $ \i -> do
+>     let sd = substpi $ spindleDeflections testSpindle
+>     baseSsd <- solveSpindleDeflections i sd
+>     let baseS = substdL 0 baseSsd
 >     let baseLife = minimum $ map (\ (b, p, n) -> abs $ eval $ cdyn b /. n)
 >                    (getBearingReactions baseS)
 >         baseRigidity = rigidity baseS
->     for innerDiameter (>= 75.*mm) [findBearingByCode "B7015C.T.P4S"] $ \ b1 -> do
->     --for innerDiameter (>= 75.*mm) std15 $ \ b1 -> do
->       --for innerDiameter (== 60.*mm) std15 $ \ b2 -> do
->         let b2 = findBearingByCode "B7012C.T.P4S"
+>     --for innerDiameter (>= 75.*mm) [findBearingByCode "B7015C.T.P4S"] $ \ b1 -> do
+>     for innerDiameter (>= 75.*mm) std15 $ \ b1 -> do
+>       for innerDiameter (== 60.*mm) std15 $ \ b2 -> do
+>         --let b2 = findBearingByCode "B7012C.T.P4S"
 >         sd <- solveSpindleDeflections i
->               (substpi $ spindleDeflections $ testSpindleConstructor b1 b2)
+>               (substpi $ spindleDeflections $ testSpindleConstructor 1 b1 b2 [0..])
 >         let sd0 = getSpindleDeflection sd (0.*mm)
 >         -- dLopt <- Maxima.eval i $ solve [diff sd0 "dL" `Equal` 0] ["dL"]
 >         -- diff sd0 has dL^6,dL^5, etc. maxima can only solve x^4...=0         
@@ -124,6 +155,12 @@ Deflection line drawing
 >     where deflections = getSpindleDeflections s [0.*mm, 1.*mm ..
 >                                                  getSpindleDeflectionsLength s]
 
+Runouts scheme drawing
+
+> runoutsScheme spindle = changeLineStyleTo ThinLine $
+>                         substituteDrawing (Map.fromList [("dL",0)]) $
+>                                           runoutsSchemeDrawing spindle
+
 Bearing filtering utilities.
 
 > all15 = filter
@@ -155,11 +192,11 @@ Output helpers.
 
 Spindle description construction.
 
-> testSpindle = testSpindleConstructor fagB7015C fagB7012C
+> testSpindle = testSpindleConstructor 1 fagB7015C fagB7012C [0,0,0,0,0]
 >   where fagB7015C = findBearingByCode "B7015C.T.P4S"
 >         fagB7012C = findBearingByCode "B7012C.T.P4S"
 
-> testSpindleConstructor b1 b2 =
+> testSpindleConstructor f b1 b2 ro =
 >     -- shaft
 >     (((cyl 82 13 <+> cyl 133 23 <+> cyl 120 8
 >       -- <+> cyl (innerDiameter b1 /. mm) (147.5+3*wd1)
@@ -171,15 +208,15 @@ Spindle description construction.
 >      `cut`
 >      (cyl 55 30 <+> cyl 45 73 <+> cyl 35 (337+3*wd1+2*wd2)))
 >     -- forces
->     `modify` addRadialForce (1.*newton) `at` 0.*mm
+>     `modify` (if f == 0 then (\s _ -> s) else addRadialForce (f.*newton)) `at` 0.*mm
 >     --`modify` addBendingMoment (0.5.*newton*.meter) `at` 1.*mm
 >     -- front bearing set
->     `modify` addBearing' b1 MountLeft  0 `at` (44+27+0.5*wd1).*mm
->     `modify` addBearing' b1 MountLeft  0 `at` (44+47+1.5*wd1).*mm
->     `modify` addBearing' b1 MountRight 0 `at` (44+79+2.5*wd1).*mm
+>     `modify` addBearing' b1 MountLeft  (ro!!0) `at` (44+27+0.5*wd1).*mm
+>     `modify` addBearing' b1 MountLeft  (ro!!1) `at` (44+47+1.5*wd1).*mm
+>     `modify` addBearing' b1 MountRight (ro!!2) `at` (44+79+2.5*wd1).*mm
 >     -- rear bearing set
->     `modify` addBearing' b2 MountLeft  0 `at` (281.5+31+3*wd1+0.5*wd2).*mm
->     `modify` addBearing' b2 MountRight 0 `at` (281.5+49+3*wd1+1.5*wd2).*mm)
+>     `modify` addBearing' b2 MountLeft  (ro!!3) `at` (281.5+31+3*wd1+0.5*wd2).*mm
+>     `modify` addBearing' b2 MountRight (ro!!4) `at` (281.5+49+3*wd1+1.5*wd2).*mm)
 >     -- section where dL is added to length
 >     `modify` (\ s _ -> s { sectionLength = sectionLength s
 >                                   +. Symbol "dL" .* meter 

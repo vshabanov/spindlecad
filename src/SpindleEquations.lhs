@@ -591,6 +591,22 @@ General utilities.
 >               `over`
 >               d (l +. sectionLength s) xs
 
+> runoutsSchemeDrawing :: Spindle -> Drawing
+> runoutsSchemeDrawing s = d (0.*mm) s
+>     where d l [] = EmptyDrawing
+>           d l (s:xs) =
+>               Line NormalLine [Point l (0.*mm),
+>                                Point (l +. sectionLength s) (0.*mm)]
+>               `over`
+>               (foldl over EmptyDrawing $
+>                map (\ (p, (ms, b)) -> Line NormalLine
+>                     [Point (l+.p) (0.*mm),
+>                      Point (l+.p) (innerRingRadialRunoutCoefficient ms
+>                                    .* innerRingRadialRunout b)]) $
+>                Map.toAscList $ bearings s)
+>               `over`
+>               d (l +. sectionLength s) xs
+
 Leftmost value from section list.
 Section list is a list of length-value pairs.
 
