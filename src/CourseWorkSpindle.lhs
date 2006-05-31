@@ -45,11 +45,11 @@ but for deflection calculation it's OK.
 
 > for fun pred l f = mapM_ f (filter (fun `is` pred) l)
 
-> main = drawRunouts
+> main = scanBearings --drawRunouts
 
 > drawBaseSpindle = withInterpreter $ \i -> do
 >     let sd = substpi $ spindleDeflections spindle
->         b1 = findBearingByCode "B7015C.T.P4S"--"B71917C.T.P4S"--"B71818C.TPA.P4"
+>         b1 = findBearingByCode "B7015C.T.P4S"--"B71917C.T.P4S""B71818C.TPA.P4"
 >         b2 = findBearingByCode "B7012C.T.P4S"
 >         spindle = testSpindleConstructor 1 0 b1 b2 [0,0..]
 >     baseSsd <- solveSpindleDeflections i sd
@@ -64,7 +64,7 @@ but for deflection calculation it's OK.
 >         xscale = 1/5
 >         yscale = cm /. 5 .* micro meter
 >         runoutsSpacing = 2.6 .* cm
->         b1 = findBearingByCode "B7015C.T.P4S"
+>         b1 = findBearingByCode "B7015C.T.P4S"--"B71917C.T.P4S"
 >         b2 = findBearingByCode "B7012C.T.P4S"
 >         consoleLength = 300.*mm
 >         spindleConstructor ro =
@@ -79,10 +79,7 @@ but for deflection calculation it's OK.
 >                          substituteDrawing (Map.fromList [("dL",0)]) $
 >                          spindleDrawing $ spindleConstructor [0,0..])
 >     -- scan 16 runout schemes & accumulate its drawings in `drawing` IORef
->     flip mapM_ [(n,[1,a,b,c,d])
->                 | n <- [0..]
->                 | a <- [1,-1], b <- [1,-1],
->                   c <- [1,-1], d <- [1,-1]] $ \ (n,ro) -> do
+>     flip mapM_ runoutSchemes $ \ (n,ro) -> do
 >       let sd = substRunouts ro generalSD
 >           spindle = spindleConstructor ro
 >           runoutsDrawing =
@@ -122,8 +119,8 @@ but for deflection calculation it's OK.
 >     let baseS = substdL 0 baseSsd
 >     let baseLife = minimum $ relativeLives 1 baseS
 >         baseRigidity = rigidity baseS
->     print $ relativeLives 1 baseS
->     print ("Base life", baseLife)
+>     --print $ relativeLives 1 baseS
+>     --print ("Base life", baseLife)
 >     --for innerDiameter (>= 75.*mm) [findBearingByCode "B7015C.T.P4S"] $ \ b1 -> do
 >     for innerDiameter (>= 75.*mm) std15 $ \ b1 -> do
 >       for innerDiameter (== 60.*mm) std15 $ \ b2 -> do
@@ -135,7 +132,7 @@ but for deflection calculation it's OK.
 >         -- diff sd0 has dL^6,dL^5, etc. maxima can only solve x^4...=0         
 >         let (sd0opt, dLopt) = minimum $
 >                               map (\ dl -> (abs $ eval $ substitutepv' [("dL",dl/1000)] sd0
->                                             /. nano meter :: Double, dl/1000)) [-40..200]
+>                                             /. nano meter :: Double, dl/1000)) [-40..500]
 >         let s = substdL 0 sd
 >         let sopt = substdL dLopt sd
 >         -- 32sec/16schemes = 2 sec per solveSpindleDeflections
@@ -158,8 +155,25 @@ but for deflection calculation it's OK.
 >         --         ("c:/" ++ shortCode b1 ++ "-" ++ shortCode b2 ++ ".lsp")
 >         --exportToACAD (deflectionLine (10 .* mm /. nano meter) sopt)
 >         --         ("c:/" ++ shortCode b1 ++ "-" ++ shortCode b2 ++ "-opt.lsp")
+>         -- Calculate optimal runouts scheme --
+>         let consoleLength = 300.*mm
+>             spindleConstructor ro =
+>                 cylinder (100.*mm) consoleLength
+>                 <+> testSpindleConstructor 0 0 b1 b2 ro
+>         sdr <- solveSpindleDeflections i
+>                (substdL 0 $ substpi $ spindleDeflections $
+>                 spindleConstructor runouts)
+>         let runouts = map (\ (n, ro) ->
+>                            let sd = substRunouts ro sdr
+>                                deflection1 = deflectionAt (0.*mm) sd / 1000
+>                                deflection2 = deflectionAt consoleLength sd / 1000 in
+>                            (max deflection1 deflection2, ro))
+>                           runoutSchemes
+>             (minRunout, optRunouts) = minimum runouts
+>         printf "%5.3f | " minRunout
+>         putStr (map (\ d -> if d == 1 then '+' else '-') optRunouts)
+>         --               
 >         putStrLn ""
-
 
 Evaluation utilities.
 
@@ -168,6 +182,10 @@ Evaluation utilities.
 >            Symbol "rob",
 >            Symbol "roc",
 >            Symbol "rod"]
+
+> runoutSchemes = [(n,[1,a,b,c,d])
+>                  | n <- [0..]
+>                  | a <- [1,-1], b <- [1,-1], c <- [1,-1], d <- [1,-1]]
 
 > substRunouts [1, a, b, c, d] =
 >     substituteSpindleDeflectionsParams [("roa", a),
@@ -252,8 +270,8 @@ Spindle description construction.
 >     -- shaft
 >     (((cyl 82 13 <+> cyl 133 23 <+> cyl 120 8
 >       -- <+> cyl (innerDiameter b1 /. mm) (147.5+3*wd1)
->       <+> cyl (innerDiameter b1 /. mm) (100)
->       <+> cyl (innerDiameter b1 /. mm) (47.5+3*wd1) -- dL here
+>       <+> cyl (innerDiameter b1 /. mm) (100+3*wd1)
+>       <+> cyl (innerDiameter b1 /. mm) (47.5) -- dL here
 >       <+> cyl 67 90
 >       <+> cyl (innerDiameter b2 /. mm) (62.5+2*wd2)
 >       <+> cyl 57 96)
@@ -273,7 +291,7 @@ Spindle description construction.
 >     `modify` (\ s _ -> s { sectionLength = sectionLength s
 >                                   +. Symbol "dL" .* meter 
 >                                 })
->              `at` ((44+100 + 1).*mm) 
+>              `at` ((44+100+3*wd1+1).*mm) 
 >     -- end
 >   where cyl d l = cylinder (d.*mm) (l.*mm)
 >         wd1 = (width b1 -. width fagB7015C) /. mm
