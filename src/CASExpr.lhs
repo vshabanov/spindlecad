@@ -204,7 +204,9 @@ simple non-recursive evaluation of Integer/Rational forms
 >           sr r = simplifyRational $ Rational r
 
 > simplifyRational (Rational r) =
->     if denominator r == 1 then Integer (numerator r) else Rational r
+>     if denominator r == 1 || numerator r == 0
+>        then Integer (numerator r)
+>        else Rational r
 
 Haskell numeric classes for CASExpr.
 

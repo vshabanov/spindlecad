@@ -26,7 +26,7 @@ Primitive 2D drawing description data type & simple exporting to ACAD lisp.
 >     LineStyle(..),
 >     exportToACAD, -- :: Drawing -> FilePath -> IO () / exportToACAD "file.lsp"
 >     mirrorX, mirrorY,
->     centeredText,
+>     centeredText, centeredTextWithHeight,
 >     move, over, scale,
 >     changeLineStyleTo,
 >     substituteDrawing,
@@ -50,7 +50,7 @@ Drawing data type.
 >              | Spline LineStyle [Point]
 >              | Circle LineStyle Point (Value Meter)
 >              | Arc LineStyle Point (Value Meter) Angle Angle
->              | Text Point String -- simple centered multi-line text
+>              | Text Point (Value Meter) String -- centered multi-line text
 >              | Over Drawing Drawing
 >                deriving (Eq, Ord, Show)
 
@@ -67,22 +67,28 @@ i.e. no pixels - vector graphics only.
 >                | HiddenLine
 >                  deriving (Eq, Ord, Show)
 
-Drawing editing
+Drawing editing.
+TODO: we must redo editing & drawing data type to something more
+orthogonal and maintainable. For the moment - left it as is.
 
 > data Editor = Editor { pointMap :: (Value Meter, Value Meter)
 >                                 -> (Value Meter, Value Meter),
 >                        arcAnglesMap :: (Angle, Angle) -> (Angle, Angle),
->                        lineStyleMap :: LineStyle -> LineStyle 
+>                        lineStyleMap :: LineStyle -> LineStyle,
+>                        scaleMap :: Value Meter -> Value Meter
 >                      }
 
 > defaultEditor = Editor { pointMap = id,
 >                          arcAnglesMap = id,
->                          lineStyleMap = id 
+>                          lineStyleMap = id,
+>                          scaleMap = id
 >                        }
 
 Text utility
 
-> centeredText x y s = Text (Point x y) s
+> centeredText x y s = Text (Point x y) (0.*mm) s
+
+> centeredTextWithHeight h x y s = Text (Point x y) h s
 
 Mirror drawing relative x-axis, y-axis
 
@@ -105,7 +111,8 @@ Drawing moving
 Drawing scaling
 
 > scale kx ky = mapDrawing (defaultEditor
->                          { pointMap = (\ (x, y) -> (kx.*x, ky.*y))
+>                          { pointMap = (\ (x, y) -> (kx.*x, ky.*y)),
+>                            scaleMap = (kx.*)
 >                          })
 
 `over` utility - the same as Over constructor but ignores EmptyDrawing
@@ -127,7 +134,8 @@ Substituting of symbols which can appear in drawing description
 > substituteDrawing m =
 >     mapDrawing (Editor { pointMap = (\ (x,y) ->(s x, s y)),
 >                          arcAnglesMap  = (\ (a1,a2) ->(sa a1, sa a2)),
->                          lineStyleMap = id 
+>                          lineStyleMap = id,
+>                          scaleMap = s
 >                        })
 >     where s = substitutepv m
 >           sa = substitute m
@@ -139,16 +147,17 @@ Drawing mapping
 >     where mapd EmptyDrawing = EmptyDrawing
 >           mapd (Line ls p) = Line (l ls) (points p)
 >           mapd (Spline ls p) = Spline (l ls) (points p)
->           mapd (Circle ls p r) = Circle (l ls) (point p) r
+>           mapd (Circle ls p r) = Circle (l ls) (point p) (scale r)
 >           mapd (Arc ls p r a1 a2) =
 >               let (a1',a2') = (arcAnglesMap e) (a1,a2) in
->               Arc (l ls) (point p) r a1' a2'
->           mapd (Text p s) = Text (point p) s
+>               Arc (l ls) (point p) (scale r) a1' a2'
+>           mapd (Text p h s) = Text (point p) (scale h) s
 >           mapd (Over d1 d2) = Over (mapd d1) (mapd d2)
 >
 >           l = lineStyleMap e
 >           points = map (liftPoint (pointMap e))
 >           point = liftPoint (pointMap e)
+>           scale = scaleMap e
 >           liftPoint f = (\ (Point x y) -> let (nx,ny) = f (x,y) in
 >                          Point nx ny)
 
@@ -283,11 +292,16 @@ Drawing to commands list conversion.
 >                     point (Point x y),
 >                     point (Point (x+.cos a1.*r) (y+.sin a1.*r)),
 >                     point (Point (x+.cos a2.*r) (y+.sin a2.*r))]]
-> drawingCommands (Text p s) =
+> drawingCommands (Text p h s) =
 >     [command "mtext" ([point p,
 >                        String "j",
->                        String "MC", -- middle-center justification
->                        point p] -- same center point
+>                        String "MC"] -- middle-center justification
+>                       ++
+>                       (if h /= 0.*mm then [String "h",
+>                                            Double (eval $ h/.mm)]
+>                                      else [])
+>                       ++
+>                       [point p] -- same center point
 >                       ++
 >                       map (\ l -> String (if l == "" then " " else l))
 >                         (lines s)

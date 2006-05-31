@@ -480,8 +480,12 @@ i.e. A0...A3 become (prefix++A0...) and all reactions become prefixR1,2,...
 >     where br l [] = []
 >           br l ((len, (sec, defls)):xs) =
 >               map (\ (pos, (ms,b)) -> (b, l+.pos,
->                                        -- R=y*j
->                                        getSectionDeflection defls pos *.
+>                                        -- R=(y-runout)*j
+>                                        (getSectionDeflection defls pos
+>                                         -.
+>                                         (innerRingRadialRunoutCoefficient ms
+>                                          .* innerRingRadialRunout b))
+>                                         *.
 >                                        radialRigidity b))
 >                       (Map.toAscList $ bearings sec)
 >               ++
@@ -568,7 +572,13 @@ Solving of spindle equation system using Maxima.
 >                forces = Map.map
 >                  (\ f -> Force { radialForce = subst $ radialForce f,
 >                                  bendingMoment = subst $ bendingMoment f 
->                                }) $ forces s
+>                                }) $ forces s,
+>                bearings = Map.map
+>                  (\ (ms, b) -> (ms { innerRingRadialRunoutCoefficient =
+>                                      substitute m $
+>                                      innerRingRadialRunoutCoefficient ms
+>                                    },
+>                                 b)) $ bearings s
 >              },
 >            (p,
 >             map (\ (l,d) -> (subst l, subst d)) secd))))
