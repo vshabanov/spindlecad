@@ -301,23 +301,24 @@ Spindle description construction.
 
 
 
--- > num n v = tabbed 8 s
--- >     where s = case n /. v of
--- >                   Integer i -> show i
--- >                   r -> show $ CASExpr.eval r
+> num n v = tabbed 5 s
+>     where s = case n /. v of
+>                   Integer i -> show i
+>                   r -> show $ CASExpr.eval r
 
--- > reportBearingParams b = do
--- >     putStrLn "| Code                  | d     | D     | B     | k     | w1    | w1'   |"
--- >     putStrLn "|-----------------------+-------+-------+-------+-------+-------+-------+"
--- >     mapM_ (\ b -> do tabbed 3 $ "| " ++ code b
--- >                      num (innerDiameter b) mm
--- >                      num (outerDiameter b) mm
--- >                      num (width b) mm
--- >                      num (radialRigidity b) (newton /. micro meter)
--- >                      num (attainableSpeedGrease b) rpm
--- >                      num (0.65 .* attainableSpeedGrease b) rpm
--- >                      putStrLn "") b
--- >     putStrLn "|-----------------------+-------+-------+-------+-------+-------+-------+"
+> reportBearingParams b = do
+>     putStrLn "| Code                  | d     | D     | B     | k     | Cdyn  | w1    | w1'   |"
+>     putStrLn "|-----------------------+-------+-------+-------+-------+-------+-------+-------+"
+>     mapM_ (\ b -> do tabbed 23 $ "| " ++ code b
+>                      num (innerDiameter b) mm
+>                      num (outerDiameter b) mm
+>                      num (width b) mm
+>                      num (radialRigidity b) (newton /. micro meter)
+>                      num (cdyn b) kN
+>                      num (attainableSpeedGrease b) rpm
+>                      num (0.65 .* attainableSpeedGrease b) rpm
+>                      putStrLn "") b
+>     putStrLn "|-----------------------+-------+-------+-------+-------+-------+-------+-------+"
 
 Example of use:
 reportBearingParams $ filter (outerDiameter `is` (== 95.*mm) &&& contactAngle `is` (== 15*degree) &&& bearingType `is` (== "Standard bearing. Steel balls.")) bearingsList
