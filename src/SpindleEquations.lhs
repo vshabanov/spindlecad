@@ -293,12 +293,14 @@ Solution of this equation is
 TODO: when J (or E) is not constant the solution is changed to one shown below.
 We must adjust our equation system generation so it automatically integrate
 
-(%i1) (integrate(integrate(integrate(integrate(y*E(x)*J(x)=p(x),x),x),x),x));
-      / / / /                           / / / /
-      [ [ [ [                           [ [ [ [
-(%o1) I I I I E(x)*J(x)*y dx dx dx dx = I I I I p(x) dx dx dx dx + 
-      ] ] ] ]                           ] ] ] ]
-      / / / /                           / / / /
+(%i1) (integrate(integrate(integrate(integrate( diff(y(x),x,4)*E(x)*J(x) = p(x),
+                                                x),x),x),x));
+
+      / / / /             4                       / / / /
+      [ [ [ [            d                       [ [ [ [
+(%o1) I I I I E(x)*J(x)*(---(y(x)) dx dx dx dx = I I I I p(x) dx dx dx dx + 
+      ] ] ] ]              4                     ] ] ] ]
+      / / / /            dx                      / / / /
 
       + A0 + A1*x + A2*x^2 + A3*x^3
 
