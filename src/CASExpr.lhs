@@ -18,8 +18,8 @@
 --  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 --
 
-This module contains CAS expression type and some utility functions
-to operate with.
+This module contains computer algebra system (CAS) expression type
+and some utility functions to operate with.
 
 > module CASExpr where
 

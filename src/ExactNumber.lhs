@@ -24,7 +24,7 @@ This module contains the exact number data type and operations on it.
 
 > import qualified ThirdParty.Era
 
-For the moment this module is only abstract user from underlying
+For the moment this module is only abstracts user from underlying
 exact number arithmetic library.
 
 > type ExactNumber = ThirdParty.Era.CR

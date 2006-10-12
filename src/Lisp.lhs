@@ -162,6 +162,7 @@ parseSimplifiedNumber - parses only integers or rationals.
 > parseExpr :: Parser Value
 > parseExpr = try parseSimplifiedNumber
 >         -- We currently don't parse strings & doubles for performance reasons
+>         -- (also we don't need this because we work only with exact numbers)
 >         --     try parseRational 
 >         -- <|> try parseDouble
 >         -- <|> try parseInteger

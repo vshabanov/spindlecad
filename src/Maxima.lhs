@@ -50,11 +50,11 @@ Its a simple tuple consisting of
 As you can see stdout contents (hGetContents stdout) made available
 as reference (which contains unread (unparsed) part of output).
 The work with this IORef done through parseRef function
-which calls specified parser and updates reference so is contains
+which calls specified parser and updates reference so it contains
 unparsed part.
 
 
-With interpreter utility
+withInterpreter utility
 
 > withInterpreter :: (Interpreter -> IO a) -> IO a
 > withInterpreter = bracket openInterpreter closeInterpreter
@@ -175,7 +175,7 @@ Lisp answer receiver.
 Since there can be non-lisp strings in answer
 (for exapmle "`rat' replaced 2.0 by 2//1 = 2.0") we parse any garbage
 until lisp value found. After this we continue parsing and return
-only last lisp value (since log massages can contain digits and
+only last lisp value (since log messages can contain digits and
 other stuff that can be misinterpreted as lisp value).
 When no lisp value found error raised.
 
@@ -400,33 +400,3 @@ Simple test case
 >     print $ substitute (Map.fromList [("A", Integer 4),
 >                                       ("B", Integer 2),
 >                                       ("C", Integer 1)]) a
-
--------------------------------------------------------------------------------
-
-Time tests.
-Machine: AMD Athlon XP 1700+, 1GB RAM
-System: Maxima 5.9.2 (GNU Common Lisp (GCL) 2.6.7)
-Method: mapM_ <test code> [1..1000]  ghc 6.4 interactive (interpreted) mode
-
-Warning !!!
-This times are incorrect, ghci (:set +s option) return only time
-in ghci itself ignoring maxima time. Retry it with PerformanceTest.
-
-maxima run (when in cache):
-
-    do { i <- openInterpreter; closeInterpreter i }             ==> ~5.1 msec
-
-equation solving (I/O only):
-
-    do sendCommand i "($solve #$(a*x^2+2*b*x+c=0)$ #$(x)$)"     ==> ~5.2 msec
-       a <- receiveAnswer i
-       return a
-
-equation solving (I/O + lisp answer parsing):
-
-    do sendCommand i "($solve #$(a*x^2+2*b*x+c=0)$ #$(x)$)"     ==> ~5 msec
-       a <- receiveAnswer i
-       let Right e = parse (do { optional spaces
-                                 e <- parseExpr
-                                 optional spaces
-                                 return e}) "" a in return e;   ==>
