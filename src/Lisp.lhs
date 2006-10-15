@@ -60,14 +60,14 @@ Data.ByteString "show" function. Its more faster than usual show
 > bshow :: Value -> B.ByteString
 > bshow (Integer i) = B.pack $ show i
 > bshow (Rational r) = B.concat [B.pack $ show (numerator r),
->                                B.packChar '/',
+>                                B.pack "/",
 >                                B.pack $ show (denominator r)]
 > bshow (Double d) = B.pack $ show d
 > bshow (Symbol s) = B.pack $ s
 > bshow (String s) = B.pack $ show s
-> bshow (List l) = B.concat [B.packChar '(',
+> bshow (List l) = B.concat [B.pack "(",
 >                            B.unwords (map bshow l),
->                            B.packChar ')']
+>                            B.pack ")"]
 > bshow (Quote v) = B.cons '\'' $ bshow v
 > bshow (AntiQuote v) = B.cons ',' $ bshow v
 
