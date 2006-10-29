@@ -27,9 +27,7 @@ List of FAG hi-precision spindle bearings and their parameters
 >   ) where
 
 > import Bearing
-> import TypeLevelPhysicalDimension
-> import TypeLevelPhysicalValue
-> import TypeLevelPhysicalUnitsList
+> import TekHaskell
 > import Text.ParserCombinators.Parsec
 > import Data.Ratio
 > import Data.List

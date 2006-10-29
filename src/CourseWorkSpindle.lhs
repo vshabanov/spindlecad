@@ -23,13 +23,7 @@
 
 This module is temporary. Its used for manual course work spindle optimization.
 
-> import CASExpr
-> import TypeLevelPhysicalDimension
-> import TypeLevelPhysicalValue
-> import TypeLevelPhysicalUnitsList
-> import Maxima hiding (eval)
-> import qualified Maxima
-> import ExactNumber
+> import TekHaskell
 > import Bearing
 > import Bearings.FAG.SpindleBearings
 > import SpindleEquations
@@ -304,7 +298,7 @@ Spindle description construction.
 > num n v = tabbed 5 s
 >     where s = case n /. v of
 >                   Integer i -> show i
->                   r -> show $ CASExpr.eval r
+>                   r -> show $ eval r
 
 > reportBearingParams b = do
 >     putStrLn "| Code                  | d     | D     | B     | k     | Cdyn  | w1    | w1'   |"

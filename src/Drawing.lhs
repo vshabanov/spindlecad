@@ -33,12 +33,9 @@ Primitive 2D drawing description data type & simple exporting to ACAD lisp.
 >     filletLine
 >   ) where
 
-> import TypeLevelPhysicalDimension
-> import TypeLevelPhysicalValue
-> import TypeLevelPhysicalUnitsList
-> import CASExpr (eval, substitute, inexactEq, inexactCompare)
-> import Lisp hiding (Value)
-> import qualified Lisp (Value)
+> import TekHaskell hiding (String, List, Symbol)
+> import TekHaskell.Lisp hiding (Value)
+> import qualified TekHaskell.Lisp as Lisp (Value)
 > import System.IO
 > import Control.Exception
 

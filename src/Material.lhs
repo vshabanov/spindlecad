@@ -22,8 +22,7 @@ Material data type that contain some common physical properties
 
 > module Material where
 
-> import TypeLevelPhysicalValue
-> import TypeLevelPhysicalUnitsList
+> import TekHaskell
 
 Material data type.
 TODO: maybe rewrite this in type classes?

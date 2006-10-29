@@ -26,20 +26,16 @@ system of equations that describes particular spindle.
 
 > module SpindleEquations where
 
-> import CASExpr hiding (eval)
-> import qualified CASExpr (eval)
+> import TekHaskell hiding (eval)
+> import TekHaskell.Maxima (eval)
+> import qualified TekHaskell.CASExpr as CASExpr (eval)
 > import Material
 > import MaterialsList
 > import Bearing
 > import Bearings.FAG.SpindleBearings
-> import Maxima
-> import TypeLevelPhysicalDimension
-> import TypeLevelPhysicalValue
-> import TypeLevelPhysicalUnitsList
 > import Data.Ratio
 > import Text.Printf
 > import qualified Data.Map as Map
-> import ExactNumber
 > import Drawing
 
 

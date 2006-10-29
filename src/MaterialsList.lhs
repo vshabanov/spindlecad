@@ -23,8 +23,7 @@ List of materials and their properties
 > module MaterialsList where
 
 > import Material
-> import TypeLevelPhysicalValue
-> import TypeLevelPhysicalUnitsList
+> import TekHaskell
 
 Steels.
 Default steel

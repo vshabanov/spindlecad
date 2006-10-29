@@ -22,10 +22,7 @@ Bearing description data type
 
 > module Bearing where
 
-> import TypeLevelPhysicalDimension
-> import TypeLevelPhysicalValue
-> import TypeLevelPhysicalUnitsList
-> import CASExpr
+> import TekHaskell
 > import Drawing
 
 Bearing data type.

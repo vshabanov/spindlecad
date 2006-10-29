@@ -1,0 +1,32 @@
+name:           TekHaskell
+version:        0.1
+license:        LGPL
+license-file:	LICENSE
+copyright:      Vladimir Shabanov
+maintainer:     Vladimir Shabanov <vshabanoff@gmail.com>
+stability:      experimental
+author:         Vladimir Shabanov
+homepage:       http://some-libs.narod.ru/tekhaskell
+package-url:    http://some-libs.narod.ru/tekhaskell/TekHaskell-0.1.tar.gz
+synopsis:       Library for simple technical computations.
+description:
+        Haskell library for computation with type level physical values,
+        exact real arithmetics 
+        and primitive interface to maxima computer algebra system.
+exposed-modules:
+        TekHaskell,
+        TekHaskell.CASExpr,
+        TekHaskell.ExactNumber,
+        TekHaskell.TypeLevelBoolean,
+        TekHaskell.TypeLevelInteger,
+        TekHaskell.TypeLevelRatio,
+        TekHaskell.TypeLevelPhysicalDimension,
+        TekHaskell.TypeLevelPhysicalValue,
+        TekHaskell.TypeLevelPhysicalUnitsList,
+        TekHaskell.Lisp,
+        TekHaskell.Maxima
+other-modules:
+        TekHaskell.ThirdParty.Era
+hs-source-dirs: src
+build-depends:  haskell98, base, parsec
+ghc-options:    -O2
