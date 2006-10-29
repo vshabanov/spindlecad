@@ -6,7 +6,7 @@
 -- David Lester, Department of Computer Science, Manchester University, M13 9PL.
 --           (2000-2001)
 
-module ThirdParty.Era where
+module TekHaskell.ThirdParty.Era where
 
 import Ratio
 import Char
