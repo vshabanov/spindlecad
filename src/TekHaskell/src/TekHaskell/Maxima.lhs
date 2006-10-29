@@ -20,7 +20,7 @@
 
 Interface to Maxima computer algebra system.
 
-> module Maxima (
+> module TekHaskell.Maxima (
 >     Interpreter,
 >     withInterpreter,
 >     eval,
@@ -37,8 +37,8 @@ Interface to Maxima computer algebra system.
 > import Data.Char
 > import Data.IORef
 > import qualified Data.Map as Map
-> import qualified Lisp
-> import CASExpr hiding (eval)
+> import qualified TekHaskell.Lisp as Lisp
+> import TekHaskell.CASExpr hiding (eval)
 > import qualified Data.ByteString.Char8 as B
 
 Type of Maxima command line interpreter.

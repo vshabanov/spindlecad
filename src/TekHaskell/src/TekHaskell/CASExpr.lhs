@@ -21,12 +21,12 @@
 This module contains computer algebra system (CAS) expression type
 and some utility functions to operate with.
 
-> module CASExpr where
+> module TekHaskell.CASExpr where
 
 > import Data.Ratio
 > import Data.IORef
 > import qualified Data.Map as Map
-> import ExactNumber
+> import TekHaskell.ExactNumber
 > import Control.Exception
 
 Abstract CAS expression.

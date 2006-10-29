@@ -27,11 +27,11 @@ Remark: conversion factors are taken
 from http://www.electro-optical.com/unitconv/unitdict/units_cat.htm
 
 
-> module TypeLevelPhysicalUnitsList where
+> module TekHaskell.TypeLevelPhysicalUnitsList where
 
-> import TypeLevelInteger
-> import TypeLevelPhysicalDimension
-> import TypeLevelPhysicalValue
+> import TekHaskell.TypeLevelInteger
+> import TekHaskell.TypeLevelPhysicalDimension
+> import TekHaskell.TypeLevelPhysicalValue
 
 Squares
 

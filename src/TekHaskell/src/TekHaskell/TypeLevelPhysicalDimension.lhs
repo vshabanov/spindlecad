@@ -23,14 +23,14 @@
 
 Type level representation of physical dimenstions.
 
-> module TypeLevelPhysicalDimension where
+> module TekHaskell.TypeLevelPhysicalDimension where
 
 The dimension is represented as tuple containing powers of all basic SI units.
 Powers are type level numbers from
 
-> import TypeLevelInteger
-> import TypeLevelRatio
-> import TypeLevelBoolean
+> import TekHaskell.TypeLevelInteger
+> import TekHaskell.TypeLevelRatio
+> import TekHaskell.TypeLevelBoolean
 
 Definitions of the Seven Basic SI Units:
 (taken from http://www.electro-optical.com/unitconv/unitdict/basic_si.htm)

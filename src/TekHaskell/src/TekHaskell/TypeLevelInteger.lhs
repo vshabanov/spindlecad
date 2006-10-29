@@ -23,9 +23,9 @@
 
 Type level integers.
 
-> module TypeLevelInteger where
+> module TekHaskell.TypeLevelInteger where
 
-> import TypeLevelBoolean
+> import TekHaskell.TypeLevelBoolean
 
 We implement sum type using separate data types for each contrustor
 and type class for the whole sum. Data types are made instances

@@ -23,7 +23,7 @@
 
 Type level booleans.
 
-> module TypeLevelBoolean where
+> module TekHaskell.TypeLevelBoolean where
 
 See TypeLevelInteger.lhs for details about function level => type level
 mapping.

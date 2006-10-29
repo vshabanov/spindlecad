@@ -20,14 +20,14 @@
 
 This module contains the exact number data type and operations on it.
 
-> module ExactNumber where
+> module TekHaskell.ExactNumber where
 
-> import qualified ThirdParty.Era
+> import qualified TekHaskell.ThirdParty.Era
 
 For the moment this module is only abstracts user from underlying
 exact number arithmetic library.
 
-> type ExactNumber = ThirdParty.Era.CR
+> type ExactNumber = TekHaskell.ThirdParty.Era.CR
 
 WARNING!
 DON'T SEE BELOW. THESE THOUGHTS ARE VERY RAW.

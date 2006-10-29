@@ -23,13 +23,13 @@
 
 Type level representation of physical values.
 
-> module TypeLevelPhysicalValue where
+> module TekHaskell.TypeLevelPhysicalValue where
 
-> import TypeLevelPhysicalDimension
-> import TypeLevelInteger -- Zero
-> import TypeLevelBoolean -- BTrue, BFalse
+> import TekHaskell.TypeLevelPhysicalDimension
+> import TekHaskell.TypeLevelInteger -- Zero
+> import TekHaskell.TypeLevelBoolean -- BTrue, BFalse
 > import qualified Data.Map as Map
-> import CASExpr
+> import TekHaskell.CASExpr
 
 
 The phantom type for physical values. It only contain numerical value

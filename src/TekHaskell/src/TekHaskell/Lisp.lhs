@@ -20,7 +20,7 @@
 
 Lisp value and lisp value I/O
 
-> module Lisp where
+> module TekHaskell.Lisp where
 
 > import Control.Monad
 > import Text.ParserCombinators.Parsec

@@ -23,7 +23,7 @@
 
 Type level ratios.
 
-> module TypeLevelRatio where
+> module TekHaskell.TypeLevelRatio where
 
 The following mathematical definition is used for rational fractions:
 
@@ -34,8 +34,8 @@ of equivalent pairs: (m,n)~(m',n') <=> mn'=m'n.
 
 For details of implementing function level code at type level see the
 
-> import TypeLevelInteger
-> import TypeLevelBoolean
+> import TekHaskell.TypeLevelInteger
+> import TekHaskell.TypeLevelBoolean
 
 > import Data.Ratio -- for use in asRational
 
