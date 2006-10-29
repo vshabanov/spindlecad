@@ -1,7 +1,7 @@
 name:           TekHaskell
 version:        0.1
 license:        LGPL
-license-file:	LICENSE
+license-file:	COPYING
 copyright:      Vladimir Shabanov
 maintainer:     Vladimir Shabanov <vshabanoff@gmail.com>
 stability:      experimental
