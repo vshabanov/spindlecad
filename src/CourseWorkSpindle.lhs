@@ -169,23 +169,103 @@ but for deflection calculation it's OK.
 >         --               
 >         putStrLn ""
 
+
+Experiment: rotating shaft with runouts
+
+> data Vector = Vector { x :: CASExpr,
+>                        y :: CASExpr 
+>                      }
+
+> addVectors v1 v2 = Vector { x = x v1 + x v2,
+>                             y = y v1 + y v2 
+>                           }
+
+> addVectorLists v1 v2 = map (\(a,b) -> addVectors a b) $ zip v1 v2
+
+> rotateVector a v = Vector { x = x v * c - y v * s,
+>                             y = x v * s + y v * c
+>                           }
+>     where c = cos a
+>           s = sin a
+
+> tupleToVector (x,y) = Vector { x = x, y = y }
+> vectorToPoint v = Point ((scale * x v) .* micro meter)
+>                         ((scale * y v) .* micro meter)
+>     where scale = cm /. micro meter
+
+All values are in micro meters
+
+> shaftVectors = map tupleToVector [(1,0),(1,0),(0,0),(1,0),(1,0)]
+
+> boreVectors = map tupleToVector  [(0,1),(0,1),(1,1),(0,1),(0,1)]
+
+> rotatedShaftVectors a = addVectorLists
+>                         (map (rotateVector a) shaftVectors)
+>                         boreVectors
+
+> rotatedShaftConsolePoint sd a = vectorToPoint $ tupleToVector (xd, yd)
+>     where xd = getSpindleDeflection xsd (0.*mm) /. micro meter
+>           yd = getSpindleDeflection ysd (0.*mm) /. micro meter
+>           rshv = rotatedShaftVectors a
+>           xsd = substRunouts (map x rshv) sd
+>           ysd = substRunouts (map y rshv) sd
+
+> toRadians a = a / 180 * pi
+
+> testRunouts angles = do
+>     putStr "solving spindle ... "
+>     generalSD <- solveGeneralSpindleDeflections
+>     putStrLn "ok"
+>              
+>     putStr "rotating shaft ... "
+>     let points = map (rotatedShaftConsolePoint generalSD . toRadians) angles
+>     putStrLn "ok"
+>              
+>     putStr "exporting drawing ... "
+>     exportToACAD (Line NormalLine points) "c:/runouts.lsp"
+>     putStrLn "ok"
+
+
 Evaluation utilities.
 
-> runouts = [1,
->            Symbol "roa",
+General spindle without forces and with runouts as symbols.
+The runout symbol can be substituted after with micro meters using substRunouts
+
+> generalSpindle = testSpindleConstructor 1 0 fagB7015C fagB7012C runouts
+>   where fagB7015C = (findBearingByCode "B7015C.T.P4S")
+>                     { innerRingRadialRunout = 1 .* micro meter 
+>                     }
+>         fagB7012C = (findBearingByCode "B7012C.T.P4S")
+>                     { innerRingRadialRunout = 1 .* micro meter 
+>                     }
+
+> optimizedGeneralSpindleDeflections =
+>     substdL 0 $ substpi $ spindleDeflections $ generalSpindle
+
+Solving of general spindle
+
+> solveGeneralSpindleDeflections = withInterpreter $ \i -> do
+>     generalSD <- solveSpindleDeflections i optimizedGeneralSpindleDeflections
+>     return generalSD
+
+Runouts symbols
+
+> runouts = [Symbol "roa",
 >            Symbol "rob",
 >            Symbol "roc",
->            Symbol "rod"]
+>            Symbol "rod",
+>            Symbol "roe"]
 
-> runoutSchemes = [(n,[1,a,b,c,d])
+> runoutSchemes = [(n,[1,b,c,d,e])
 >                  | n <- [0..]
->                  | a <- [1,-1], b <- [1,-1], c <- [1,-1], d <- [1,-1]]
+>                  | b <- [1,-1], c <- [1,-1], d <- [1,-1], e <- [1,-1]]
 
-> substRunouts [1, a, b, c, d] =
+> substRunouts [a, b, c, d, e] =
 >     substituteSpindleDeflectionsParams [("roa", a),
 >                                         ("rob", b),
 >                                         ("roc", c),
->                                         ("rod", d)]
+>                                         ("rod", d),
+>                                         ("roe", e)]
 
 > substdL dl = substituteSpindleDeflectionsParams [("dL",dl)]
 
@@ -260,7 +340,7 @@ Spindle description construction.
 >   where fagB7015C = findBearingByCode "B7015C.T.P4S"
 >         fagB7012C = findBearingByCode "B7012C.T.P4S"
 
-> testSpindleConstructor f l b1 b2 ro =
+> testSpindleConstructor f offset b1 b2 ro =
 >     -- shaft
 >     (((cyl 82 13 <+> cyl 133 23 <+> cyl 120 8
 >       -- <+> cyl (innerDiameter b1 /. mm) (147.5+3*wd1)
@@ -273,7 +353,7 @@ Spindle description construction.
 >      (cyl 55 30 <+> cyl 45 73 <+> cyl 35 (337+3*wd1+2*wd2)))
 >     -- forces
 >     `modify` (if f == 0 then (\s _ -> s) else addRadialForce (f.*newton)) `at` 0.*mm
->     `modify` (if l == 0 then (\s _ -> s) else addBendingMoment ((f*l).*newton*.meter)) `at` 1.*mm
+>     `modify` (if offset == 0 then (\s _ -> s) else addBendingMoment ((f*offset).*newton*.meter)) `at` 1.*mm
 >     -- front bearing set
 >     `modify` addBearing' b1 MountLeft  (ro!!0) `at` (44+27+0.5*wd1).*mm
 >     `modify` addBearing' b1 MountLeft  (ro!!1) `at` (44+47+1.5*wd1).*mm
