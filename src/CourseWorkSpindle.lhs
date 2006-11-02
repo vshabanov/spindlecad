@@ -188,6 +188,8 @@ Experiment: rotating shaft with runouts
 >     where c = cos a
 >           s = sin a
 
+> vectorLength v = sqrt $ x v ^ 2 + y v ^ 2
+
 > tupleToVector (x,y) = Vector { x = x, y = y }
 > vectorToPoint v = Point ((scale * x v) .* micro meter)
 >                         ((scale * y v) .* micro meter)
@@ -203,14 +205,23 @@ All values are in micro meters
 >                         (map (rotateVector a) shaftVectors)
 >                         boreVectors
 
-> rotatedShaftConsolePoint sd a = vectorToPoint $ tupleToVector (xd, yd)
+> rotatedShaftConsolePoint sd a = vectorToPoint $
+>                                 consoleVectorFromRunouts sd rshv
+>     where rshv = rotatedShaftVectors a
+
+> consoleVectorFromRunouts sd runoutsVector = tupleToVector (xd, yd)
 >     where xd = getSpindleDeflection xsd (0.*mm) /. micro meter
 >           yd = getSpindleDeflection ysd (0.*mm) /. micro meter
->           rshv = rotatedShaftVectors a
->           xsd = substRunouts (map x rshv) sd
->           ysd = substRunouts (map y rshv) sd
+>           xsd = substRunouts (map x runoutsVector) sd
+>           ysd = substRunouts (map y runoutsVector) sd
 
 > toRadians a = a / 180 * pi
+
+little conclusion to testRunouts:
+  Bore displacements only give us additional reactions
+  and displaces shaft axis. They are doesn't influence spindle runout.
+  Remark: stated above correct only for cases when bearing rigidity is linear
+          (at least I think so).
 
 > testRunouts angles = do
 >     putStr "solving spindle ... "
@@ -225,6 +236,42 @@ All values are in micro meters
 >     exportToACAD (Line NormalLine points) "c:/runouts.lsp"
 >     putStrLn "ok"
 
+little conclusion to testSeparateInnerRingRotation:
+  We can get pretty small runout vectors for some angle combintaions
+  (for example: 0.059 instead of 2.500 for [0, 180, 150, 30, 180]).
+  But we forgot that spindle shaft has non-zero angle at console point,
+  so the real runout on all cutting distance will be inequal to
+  console point runout.
+
+TODO: add 300 mm console part and determine runout vectors at both parts
+      and print minimum runout
+
+> testSeparateInnerRingRotation = do
+>     putStr "solving spindle ... "
+>     generalSD <- solveGeneralSpindleDeflections
+>     putStrLn "ok"
+>              
+>     let angleLists = [(n,[0,b,c,d,e]) | n <- [1..]
+>                                       | b <- range,
+>                                         c <- range,
+>                                         d <- range,
+>                                         e <- range]
+>         range = [0,30..330]
+>         runoutVectors = map tupleToVector [(2.5,0),(2.5,0),(2.5,0),(2.5,0),(2.5,0)]
+>                         
+>     flip mapM_ angleLists $ \ (n, angles) -> do
+>         let rotatedRunouts = [rotateVector (toRadians a) v
+>                               | a <- angles
+>                               | v <- runoutVectors]
+>             consoleVector = consoleVectorFromRunouts generalSD rotatedRunouts
+>             runout = vectorLength consoleVector
+>         printf "%5d ; " (n::Integer)
+>         mapM_ (printf "%5.0f ; " . evald) angles
+>         printf "%6.3f ; " $ evald $ x consoleVector
+>         printf "%6.3f ; " $ evald $ y consoleVector
+>         printf "%5.3f\n" $ evald runout
+>
+>     putStrLn "done."
 
 Evaluation utilities.
 
