@@ -22,6 +22,7 @@
 > {-# OPTIONS -fallow-undecidable-instances #-}
 
 This module is temporary. Its used for manual course work spindle optimization.
+Also it used for some other experiments.
 
 > import TekHaskell
 > import Bearing
@@ -33,13 +34,13 @@ This module is temporary. Its used for manual course work spindle optimization.
 > import qualified Data.Map as Map
 
 The spindle of machine tool used in course work.
-Console force of 1N and five FAG bearings.
+Console force of 1N (or none) and five FAG bearings.
 Geometry is simplified against real spindle (many groves are removed),
 but for deflection calculation it's OK.
 
 > for fun pred l f = mapM_ f (filter (fun `is` pred) l)
 
-> main = scanBearings --drawRunouts
+> main = testSeparateInnerRingRotation --scanBearings --drawRunouts
 
 > drawBaseSpindle = withInterpreter $ \i -> do
 >     let sd = substpi $ spindleDeflections spindle
@@ -53,6 +54,10 @@ but for deflection calculation it's OK.
 >     exportToACAD (deflectionLine (10 .* mm /. nano meter) baseS)
 >                  "C:/base-spindle-deflections.lsp"
 
+> runoutSchemes = [(n,[1,b,c,d,e])
+>                  | n <- [0..]
+>                  | b <- [1,-1], c <- [1,-1], d <- [1,-1], e <- [1,-1]]
+
 > drawRunouts = withInterpreter $ \i -> do
 >     let scaleDrawing = scale xscale yscale
 >         xscale = 1/5
@@ -60,10 +65,7 @@ but for deflection calculation it's OK.
 >         runoutsSpacing = 2.6 .* cm
 >         b1 = findBearingByCode "B7015C.T.P4S"--"B71917C.T.P4S"
 >         b2 = findBearingByCode "B7012C.T.P4S"
->         consoleLength = 300.*mm
->         spindleConstructor ro =
->             cylinder (100.*mm) consoleLength
->             <+> testSpindleConstructor 0 0 b1 b2 ro
+>         spindleConstructor ro = console <+> testSpindleConstructor 0 0 b1 b2 ro
 >         generalSpindle = spindleConstructor runouts
 >     putStr "solving spindle... "
 >     generalSD <- solveSpindleDeflections i
@@ -169,7 +171,6 @@ but for deflection calculation it's OK.
 >         --               
 >         putStrLn ""
 
-
 Experiment: rotating shaft with runouts
 
 > data Vector = Vector { x :: CASExpr,
@@ -206,13 +207,17 @@ All values are in micro meters
 >                         boreVectors
 
 > rotatedShaftConsolePoint sd a = vectorToPoint $
->                                 consoleVectorFromRunouts sd rshv
+>                                 vectorFromRunouts sd rshv (0.*mm)
 >     where rshv = rotatedShaftVectors a
 
-> consoleVectorFromRunouts sd runoutsVector = tupleToVector (xd, yd)
->     where xd = getSpindleDeflection xsd (0.*mm) /. micro meter
->           yd = getSpindleDeflection ysd (0.*mm) /. micro meter
->           xsd = substRunouts (map x runoutsVector) sd
+> vectorFromRunouts sd runoutsVector coord =
+>     head $ vectorsFromRunouts sd runoutsVector [coord]
+
+> vectorsFromRunouts sd runoutsVector coords =
+>     map (\ c -> tupleToVector (getSpindleDeflection xsd c /. micro meter,
+>                                getSpindleDeflection ysd c /. micro meter))
+>         coords
+>     where xsd = substRunouts (map x runoutsVector) sd
 >           ysd = substRunouts (map y runoutsVector) sd
 
 > toRadians a = a / 180 * pi
@@ -225,7 +230,7 @@ little conclusion to testRunouts:
 
 > testRunouts angles = do
 >     putStr "solving spindle ... "
->     generalSD <- solveGeneralSpindleDeflections
+>     generalSD <- solveOptimizedSpindle testSpindleWithRunouts
 >     putStrLn "ok"
 >              
 >     putStr "rotating shaft ... "
@@ -243,57 +248,78 @@ little conclusion to testSeparateInnerRingRotation:
   so the real runout on all cutting distance will be inequal to
   console point runout.
 
-TODO: add 300 mm console part and determine runout vectors at both parts
-      and print minimum runout
+After 300 mm console part added and runout vectors are  determines
+at both parts we get that optimum is BMW like:
+    angles: 0, 120, 240, 60, 0
+    vector at   0mm: (-0.096, 0.053) length = runout at   0mm = 0.109
+    vector at 300mm: ( 0.060, 0.108) length = runout at 300mm = 0.124
+  it's pretty good for 2.5 initial run-out
+
+After settings eccentricity = 1/2 run-out = 1/2 * 2.5 = 1.25
+we get the same results, only vectors twice shorten.
 
 > testSeparateInnerRingRotation = do
 >     putStr "solving spindle ... "
->     generalSD <- solveGeneralSpindleDeflections
+>     sd <- solveOptimizedSpindle (console <+> testSpindleWithRunouts)
 >     putStrLn "ok"
 >              
 >     let angleLists = [(n,[0,b,c,d,e]) | n <- [1..]
->                                       | b <- range,
+>                                       | b <- halfRange, -- up/down symmetry
 >                                         c <- range,
 >                                         d <- range,
 >                                         e <- range]
 >         range = [0,30..330]
->         runoutVectors = map tupleToVector [(2.5,0),(2.5,0),(2.5,0),(2.5,0),(2.5,0)]
+>         halfRange = takeWhile (< 180) range
+>         runoutVectors = map tupleToVector [(1.25,0),(1.25,0),(1.25,0),(1.25,0),(1.25,0)]
 >                         
 >     flip mapM_ angleLists $ \ (n, angles) -> do
 >         let rotatedRunouts = [rotateVector (toRadians a) v
 >                               | a <- angles
 >                               | v <- runoutVectors]
->             consoleVector = consoleVectorFromRunouts generalSD rotatedRunouts
->             runout = vectorLength consoleVector
+>             [vector1, vector2] = vectorsFromRunouts sd rotatedRunouts
+>                                  [0.*mm, consoleLength]
+>             runout1 = evald $ vectorLength vector1
+>             runout2 = evald $ vectorLength vector2
 >         printf "%5d ; " (n::Integer)
 >         mapM_ (printf "%5.0f ; " . evald) angles
->         printf "%6.3f ; " $ evald $ x consoleVector
->         printf "%6.3f ; " $ evald $ y consoleVector
->         printf "%5.3f\n" $ evald runout
+>         printf "%6.3f ; " $ evald $ x vector1
+>         printf "%6.3f ; " $ evald $ y vector1
+>         printf "%6.3f ; " $ evald $ x vector2
+>         printf "%6.3f ; " $ evald $ y vector2
+>         printf "%5.3f ; " runout1
+>         printf "%5.3f ; " runout2
+>         printf "%5.3f\n" (max runout1 runout2)
 >
 >     putStrLn "done."
 
 Evaluation utilities.
 
-General spindle without forces and with runouts as symbols.
+> optimizeSpindleDeflections =
+>     substdL 0 . substpi -- it not only optimize it also makes dL = 0
+
+> optimizedSpindleDeflections =
+>     optimizeSpindleDeflections . spindleDeflections
+
+> solveOptimizedSpindle spindle = withInterpreter $ \i -> do
+>     solvedSD <- solveSpindleDeflections i (optimizedSpindleDeflections spindle)
+>     return solvedSD
+
+Additional console
+
+> consoleLength = 300.*mm
+
+> console = cylinder (100.*mm) consoleLength
+
+Test spindle without forces and with runouts as symbols.
 The runout symbol can be substituted after with micro meters using substRunouts
 
-> generalSpindle = testSpindleConstructor 1 0 fagB7015C fagB7012C runouts
+> testSpindleWithRunouts = testSpindleConstructor 0 0 fagB7015C fagB7012C runouts
 >   where fagB7015C = (findBearingByCode "B7015C.T.P4S")
 >                     { innerRingRadialRunout = 1 .* micro meter 
 >                     }
 >         fagB7012C = (findBearingByCode "B7012C.T.P4S")
 >                     { innerRingRadialRunout = 1 .* micro meter 
 >                     }
-
-> optimizedGeneralSpindleDeflections =
->     substdL 0 $ substpi $ spindleDeflections $ generalSpindle
-
-Solving of general spindle
-
-> solveGeneralSpindleDeflections = withInterpreter $ \i -> do
->     generalSD <- solveSpindleDeflections i optimizedGeneralSpindleDeflections
->     return generalSD
 
 Runouts symbols
 
@@ -302,10 +328,6 @@ Runouts symbols
 >            Symbol "roc",
 >            Symbol "rod",
 >            Symbol "roe"]
-
-> runoutSchemes = [(n,[1,b,c,d,e])
->                  | n <- [0..]
->                  | b <- [1,-1], c <- [1,-1], d <- [1,-1], e <- [1,-1]]
 
 > substRunouts [a, b, c, d, e] =
 >     substituteSpindleDeflectionsParams [("roa", a),
