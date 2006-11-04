@@ -284,36 +284,41 @@ we can reduce run-outs several times even for 3 bearings spindle.
 >     sd <- solveOptimizedSpindle (console <+> testSpindleWithRunouts)
 >     --putStrLn "ok"
 >              
->     let angleLists = [(n,[0,b,c,d,e]) | n <- [1..]
->                                       | b <- halfRange, -- up/down symmetry
->                                         c <- range,
->                                         d <- range,
->                                         e <- range]
->         --range = [0,1..359]
->         --range = [0,5..355]
->         range = [0,30..330]
+>     let range = [0,30..330]
 >         halfRange = takeWhile (<= 180) range
->         runoutVectors = map tupleToVector [(1.25,0),(1.25,0),(1.25,0),(1.25,0),(1.25,0)]
->                         
->     flip mapM_ angleLists $ \ (n, angles) -> do
->         let rotatedRunouts = [rotateVector (toRadians a) v
->                               | a <- angles
->                               | v <- runoutVectors]
->             [vector1, vector2] = vectorsFromRunouts sd rotatedRunouts
->                                  [0.*mm, consoleLength]
->             runout1 = evald $ vectorLength vector1
->             runout2 = evald $ vectorLength vector2
->         printf "%5d ; " (n::Integer)
->         mapM_ (printf "%5.0f ; " . evald) angles
->         printf "%6.3f ; " $ evald $ x vector1
->         printf "%6.3f ; " $ evald $ y vector1
->         printf "%6.3f ; " $ evald $ x vector2
->         printf "%6.3f ; " $ evald $ y vector2
->         printf "%5.3f ; " runout1
->         printf "%5.3f ; " runout2
+>
+>     n <- newIORef (1::Integer)
+>
+>     flip mapM_ (substAngleRange "roa" (1.25,0) [0] (sd,sd))   $ \ (bAngle, sdxsdy) -> do
+>     flip mapM_ (substAngleRange "rob" (1.25,0) halfRange sdxsdy) $ \ (bAngle, sdxsdy) -> do
+>     flip mapM_ (substAngleRange "roc" (1.25,0) range sdxsdy)  $ \ (cAngle, sdxsdy) -> do
+>     flip mapM_ (substAngleRange "rod" (1.25,0) range sdxsdy)  $ \ (dAngle, sdxsdy) -> do
+>     flip mapM_ (substAngleRange "roe" (1.25,0) range sdxsdy)  $ \ (eAngle, (sdx,sdy)) -> do
+>         let x1 = evald $ getSpindleDeflection sdx (0.*mm) /. micro meter
+>             y1 = evald $ getSpindleDeflection sdy (0.*mm) /. micro meter
+>             x2 = evald $ getSpindleDeflection sdx consoleLength /. micro meter
+>             y2 = evald $ getSpindleDeflection sdy consoleLength /. micro meter
+>             runout1 = sqrt $ x1*x1 + y1*y1
+>             runout2 = sqrt $ x2*x2 + y2*y2
+>         curn <- readIORef n
+>         printf "%5d ; " curn
+>         modifyIORef n (+ 1)
+>         mapM_ (printf "%5.0f ; " . evald) [0, bAngle, cAngle, dAngle, eAngle]
+>         mapM_ (printf "%6.3f ; ") [x1, y1, x2, y2]
+>         mapM_ (printf "%5.3f ; ") [runout1, runout2]
 >         printf "%5.3f\n" (max runout1 runout2)
 >
 >     --putStrLn "done."
+
+> substRange var range sd = map (\ val -> (val, subst val)) range
+>     where subst val = substituteSpindleDeflectionsParams [(var, val)] sd
+
+> substAngleRange var tvec angleRange (sdx, sdy) =
+>       map (\ angle -> (angle, subst angle)) angleRange
+>     where vec = tupleToVector tvec
+>           subst angle = (substituteSpindleDeflectionsParams [(var, x rv)] sdx,
+>                          substituteSpindleDeflectionsParams [(var, y rv)] sdy)
+>               where rv = rotateVector (toRadians angle) vec
 
 Evaluation utilities.
 
