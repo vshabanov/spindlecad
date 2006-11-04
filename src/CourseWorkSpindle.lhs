@@ -250,26 +250,49 @@ little conclusion to testSeparateInnerRingRotation:
 
 After 300 mm console part added and runout vectors are  determines
 at both parts we get that optimum is BMW like:
-    angles: 0, 120, 240, 60, 0
+    angles: 0, 120, 240, 60, 0   (BMW)
     vector at   0mm: (-0.096, 0.053) length = runout at   0mm = 0.109
     vector at 300mm: ( 0.060, 0.108) length = runout at 300mm = 0.124
-  it's pretty good for 2.5 initial run-out
+  0.124 it's pretty good for 2.5 initial run-out
 
 After settings eccentricity = 1/2 run-out = 1/2 * 2.5 = 1.25
 we get the same results, only vectors twice shorten.
 
+for 4 bearing (3rd commented out), 1.25 eccentricity, we get:
+    angles: 0, 180, _, 60, 300   (Pacific)
+    vector at   0mm: (-0.122, -0.109) length = 0.164, runout = 0.328
+    vector at 300mm: ( 0.015,  0.003) length = 0.016
+  0.328 it's not so bad for 2.5 initial run-out
+
+for 3 bearings (3,4 commented out), 1.25 eccentricity, we get:
+    angles: 0, 120, _, _, 30 (strange?)
+    angles: 0, 132, _, _, 33 (with 1 degree step), 0.337, runout 0.647
+    vector at   0mm: (-0.123, 0.002) length = 0.123
+    vector at 300mm: ( 0.250, 0.410) length = 0.480, runout = 0.960
+  0.960 it's ~2.5 times smaller than 2.5 initial run-out
+  0.647 it's ~3.8 times smaller than 2.5 initial run-out
+
+for 2 bearings we get what we should get:
+    angles: 0, 0 (direct both in one side)
+
+Heh, not so bad!
+Using different mount angles (not only 0 or 180) for bearing inner rings
+we can reduce run-outs several times even for 3 bearings spindle.
+
 > testSeparateInnerRingRotation = do
->     putStr "solving spindle ... "
+>     --putStr "solving spindle ... "
 >     sd <- solveOptimizedSpindle (console <+> testSpindleWithRunouts)
->     putStrLn "ok"
+>     --putStrLn "ok"
 >              
 >     let angleLists = [(n,[0,b,c,d,e]) | n <- [1..]
 >                                       | b <- halfRange, -- up/down symmetry
 >                                         c <- range,
 >                                         d <- range,
 >                                         e <- range]
+>         --range = [0,1..359]
+>         --range = [0,5..355]
 >         range = [0,30..330]
->         halfRange = takeWhile (< 180) range
+>         halfRange = takeWhile (<= 180) range
 >         runoutVectors = map tupleToVector [(1.25,0),(1.25,0),(1.25,0),(1.25,0),(1.25,0)]
 >                         
 >     flip mapM_ angleLists $ \ (n, angles) -> do
@@ -290,7 +313,7 @@ we get the same results, only vectors twice shorten.
 >         printf "%5.3f ; " runout2
 >         printf "%5.3f\n" (max runout1 runout2)
 >
->     putStrLn "done."
+>     --putStrLn "done."
 
 Evaluation utilities.
 
