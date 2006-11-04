@@ -1,0 +1,19 @@
+name:           SpindleCAD
+version:        0.1
+license:        GPL
+license-file:	COPYING
+copyright:      Vladimir Shabanov
+maintainer:     Vladimir Shabanov <vshabanoff@gmail.com>
+stability:      experimental
+author:         Vladimir Shabanov
+homepage:       http://spindlecad.sourceforge.net
+package-url:    
+synopsis:       Machine tool spindle design and optimisation program.
+description:
+        See the http://spindlecad.sourceforge.net
+executable:     bin/SpindleCAD.exe
+main-is:        CourseWorkSpindle
+hs-source-dirs: src
+other-modules:
+build-depends:  haskell98, base, TekHaskell
+ghc-options:    -O2
