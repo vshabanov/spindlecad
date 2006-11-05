@@ -416,6 +416,29 @@ TODO: direct search of optimum angles is long. some optimization algorithm must 
 >                          substituteSpindleDeflectionsParams [(var, y rv)] sdy)
 >               where rv = rotateVector (toRadians angle) vec
 
+> dynamicReaction mass omega radius = mass *. square omega *. radius
+
+For our test spindle (18kg shaft, 7000rpm max, 1.25mum eccentricity) the dynamic reaction
+is only 12N, while one front bearing radial rigidity is 230.4N/mum. So dynamic reaction
+is pretty small in comparison with static reaction (I think that in real constructions
+center of mass eccentricity is much bigger than geometrical shaft axis eccentricity).
+
+*Main> eval $ dynamicReaction (18.*kilogram) ((2*pi*7000).*rpm) (1.25.*micro meter) /. newton
+12.090265391334462
+*Main> eval $ (radialRigidity $ findBearingByCode "B7015C.T.P4S") /. (newton /. micro meter)
+230.4
+
+little conclusion about dynamicReaction:
+The minimizing of spindle shaft runout has nothing to do with minimizing of
+bearings dynamic reaction. In high speed cutting (for example, for 30000rpm
+the reaction is 222N) it can possibly help in minimising such reaction.
+But we can diminish dynamic reaction simply by moving center of mass,
+e.g. by drilling some metal off the shaft. And this method work for any RPM
+and any axial displacement.
+Although the minimizing of run-out decreases dynamic reaction, the real problem
+with dynamic reaction is problems with unprecise shaft, not bearings.
+
+
 Evaluation utilities.
 
 > permutations [] = [[]]
