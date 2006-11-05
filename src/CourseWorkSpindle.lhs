@@ -32,6 +32,7 @@ Also it used for some other experiments.
 > import Drawing
 > import Data.IORef
 > import qualified Data.Map as Map
+> import qualified Data.Set as Set
 
 The spindle of machine tool used in course work.
 Console force of 1N (or none) and five FAG bearings.
@@ -195,6 +196,14 @@ Experiment: rotating shaft with runouts
 > vectorToPoint v = Point ((scale * x v) .* micro meter)
 >                         ((scale * y v) .* micro meter)
 >     where scale = cm /. micro meter
+> vectorToEvaluatedTuple v = (evald $ x v, evald $ y v)
+
+> rotateTuple a (x,y) = ( x * c - y * s,
+>                         x * s + y * c )
+>     where c = cos a
+>           s = sin a
+
+> plusTuple (x1, y1) (x2, y2) = (x1+x2, y1+y2)
 
 All values are in micro meters
 
@@ -241,15 +250,10 @@ little conclusion to testRunouts:
 >     exportToACAD (Line NormalLine points) "c:/runouts.lsp"
 >     putStrLn "ok"
 
-little conclusion to testSeparateInnerRingRotation:
-  We can get pretty small runout vectors for some angle combintaions
-  (for example: 0.059 instead of 2.500 for [0, 180, 150, 30, 180]).
-  But we forgot that spindle shaft has non-zero angle at console point,
-  so the real runout on all cutting distance will be inequal to
-  console point runout.
 
-After 300 mm console part added and runout vectors are  determines
-at both parts we get that optimum is BMW like:
+Some results for optimum runouts configuration:
+
+for 5 bearings, 2.5 runout, we get that optimum is BMW like:
     angles: 0, 120, 240, 60, 0   (BMW)
     vector at   0mm: (-0.096, 0.053) length = runout at   0mm = 0.109
     vector at 300mm: ( 0.060, 0.108) length = runout at 300mm = 0.124
@@ -279,36 +283,128 @@ Heh, not so bad!
 Using different mount angles (not only 0 or 180) for bearing inner rings
 we can reduce run-outs several times even for 3 bearings spindle.
 
+little conclusion for bearings with different run-outs:
+The bearing with smallest run-out not necessarily must be first.
+Optimal configuration may differ for different run-out sets
+(and also for different resolution in optimum search, e.g. for 10 degree step
+we determine optimum more precisely and it's usuallt not same as for 30 degree step,
+but we have problem of precise mounting for precise angles).
+
 > testSeparateInnerRingRotation = do
 >     --putStr "solving spindle ... "
 >     sd <- solveOptimizedSpindle (console <+> testSpindleWithRunouts)
 >     --putStrLn "ok"
->              
+>
+>     let runouts = [1.25, 1.75, 0.75,  1.0, 1.5]
+>         permutedRunouts = [front ++ rear |
+>                            front <- filterUnique $ permutations (take 3 runouts),
+>                            rear  <- filterUnique $ permutations (drop 3 runouts)]
+>     flip mapM_ permutedRunouts $ \ runouts -> do
+>         mapM_ (printf "%4.2f ; " . evald) runouts
+>         o <- searchOptimum2 sd runouts
+>         printLine o
+>     putStrLn "done."
+
+In search of optimum inner ring rotation angles combination
+we iterate over range of inner ring rotation angles and
+substitute run-out values by rotated vector coordinates.
+To get console run-out we use two independent spindle deflections values
+for X0Z and for Y0Z planes.
+Also we use additional console to get runouts at two points: end of longest part
+and end of spindle shaft. Maximum run-out is used afterwards.
+
+> searchOptimum sd [roa, rob, roc, rod, roe] = do
 >     let range = [0,30..330]
 >         halfRange = takeWhile (<= 180) range
 >
->     n <- newIORef (1::Integer)
+>     optimum <- newIORef (undefined, undefined, undefined, 10000.0)
+>     --n <- newIORef (1::Integer)
 >
->     flip mapM_ (substAngleRange "roa" (1.25,0) [0] (sd,sd))   $ \ (bAngle, sdxsdy) -> do
->     flip mapM_ (substAngleRange "rob" (1.25,0) halfRange sdxsdy) $ \ (bAngle, sdxsdy) -> do
->     flip mapM_ (substAngleRange "roc" (1.25,0) range sdxsdy)  $ \ (cAngle, sdxsdy) -> do
->     flip mapM_ (substAngleRange "rod" (1.25,0) range sdxsdy)  $ \ (dAngle, sdxsdy) -> do
->     flip mapM_ (substAngleRange "roe" (1.25,0) range sdxsdy)  $ \ (eAngle, (sdx,sdy)) -> do
+>     do flip mapM_ (substAngleRange "roa" (roa,0) [0] (sd,sd))   $ \ (_, sdxsdy) -> do
+>        flip mapM_ (substAngleRange "rob" (rob,0) halfRange sdxsdy) $ \ (bAngle, sdxsdy) -> do
+>        flip mapM_ (substAngleRange "roc" (roc,0) range sdxsdy)  $ \ (cAngle, sdxsdy) -> do
+>        flip mapM_ (substAngleRange "rod" (rod,0) range sdxsdy)  $ \ (dAngle, sdxsdy) -> do
+>        flip mapM_ (substAngleRange "roe" (roe,0) range sdxsdy)  $ \ (eAngle, (sdx,sdy)) -> do
 >         let x1 = evald $ getSpindleDeflection sdx (0.*mm) /. micro meter
 >             y1 = evald $ getSpindleDeflection sdy (0.*mm) /. micro meter
 >             x2 = evald $ getSpindleDeflection sdx consoleLength /. micro meter
 >             y2 = evald $ getSpindleDeflection sdy consoleLength /. micro meter
 >             runout1 = sqrt $ x1*x1 + y1*y1
 >             runout2 = sqrt $ x2*x2 + y2*y2
->         curn <- readIORef n
->         printf "%5d ; " curn
->         modifyIORef n (+ 1)
->         mapM_ (printf "%5.0f ; " . evald) [0, bAngle, cAngle, dAngle, eAngle]
->         mapM_ (printf "%6.3f ; ") [x1, y1, x2, y2]
->         mapM_ (printf "%5.3f ; ") [runout1, runout2]
->         printf "%5.3f\n" (max runout1 runout2)
+>             maxRunout = max runout1 runout2
+>             line = ([0, bAngle, cAngle, dAngle, eAngle],
+>                     (x1, y1, runout1),
+>                     (x2, y2, runout2),
+>                     maxRunout)
+>         (_, _, _, minRunout) <- readIORef optimum
+>         if maxRunout < minRunout
+>          then
+>            do modifyIORef optimum (\ _ -> line)
+>          else
+>            do return ()
+>         --curn <- readIORef n
+>         --printf "%5d ; " curn
+>         --modifyIORef n (+ 1)
+>         --printLine line
+>     o <- readIORef optimum
+>     return o
+
+In search optimum II we use the fact that in linear system console run-out can be
+calculated separately for each bearing run-out and then summed togethe.
+So we calculate console run-out vectors and then search the minimal total run-out
+by rotation of calculated vectors, not by rotating run-outs and calculating console
+run-out after.
+
+TODO: direct search of optimum angles is long. some optimization algorithm must exists.
+
+> searchOptimum2 sd [roa, rob, roc, rod, roe] = do
+>     let range = [0,10..350] -- much better (2,3x smaller runouts) than 30 degree step
+>         halfRange = takeWhile (<= 180) range
+>         toVectors = map (\ x -> Vector { x = x, y = 0 })
+>         makeVecs r = map vectorToEvaluatedTuple $
+>                      vectorsFromRunouts sd (toVectors r)
+>                                         [0.*mm, consoleLength]
+>         vecsa = makeVecs [roa, 0, 0, 0, 0]
+>         vecsb = makeVecs [0, rob, 0, 0, 0]
+>         vecsc = makeVecs [0, 0, roc, 0, 0]
+>         vecsd = makeVecs [0, 0, 0, rod, 0]
+>         vecse = makeVecs [0, 0, 0, 0, roe]
+>         rotateAndSum [baseVec1, baseVec2] [vec1, vec2] angle =
+>             (angle,
+>              [rotateTuple rangle vec1 `plusTuple` baseVec1,
+>               rotateTuple rangle vec2 `plusTuple` baseVec2])
+>           where rangle = toRadians angle
+>         scan base vecs range =
+>             flip mapM_ (map (rotateAndSum base vecs) range)
 >
->     --putStrLn "done."
+>     optimum <- newIORef (undefined, undefined, undefined, 10000.0)
+>
+>     do scan vecsa vecsb halfRange $ \ (bAngle, sum) -> do
+>        scan sum   vecsc range     $ \ (cAngle, sum) -> do
+>        scan sum   vecsd range     $ \ (dAngle, sum) -> do
+>        scan sum   vecse range     $ \ (eAngle, sum) -> do
+>         let [(x1,y1), (x2,y2)] = sum
+>             runout1 = sqrt $ x1*x1 + y1*y1
+>             runout2 = sqrt $ x2*x2 + y2*y2
+>             maxRunout = max runout1 runout2
+>             line = (map (fromRational . toRational) [0, bAngle, cAngle, dAngle, eAngle],
+>                     (x1, y1, runout1),
+>                     (x2, y2, runout2),
+>                     maxRunout)
+>         (_, _, _, minRunout) <- readIORef optimum
+>         if maxRunout < minRunout
+>          then
+>            do modifyIORef optimum (\ _ -> line)
+>          else
+>            do return ()
+>     o <- readIORef optimum
+>     return o
+
+> printLine (angles, (x1, y1, runout1), (x2, y2, runout2), maxRunout) = do
+>     mapM_ (printf "%5.0f ; " . evald) angles
+>     mapM_ (printf "%6.3f ; ") [x1, y1, x2, y2]
+>     mapM_ (printf "%5.3f ; ") [runout1, runout2]
+>     printf "%5.3f\n" maxRunout
 
 > substRange var range sd = map (\ val -> (val, subst val)) range
 >     where subst val = substituteSpindleDeflectionsParams [(var, val)] sd
@@ -321,6 +417,14 @@ we can reduce run-outs several times even for 3 bearings spindle.
 >               where rv = rotateVector (toRadians angle) vec
 
 Evaluation utilities.
+
+> permutations [] = [[]]
+> permutations (h:t) = concat $ map (insert h) (permutations t)
+>     where insert x [] = [[x]]
+>           insert x (h:t) = (x:h:t) : map (\ m -> h:m) (insert x t)
+
+> filterUnique :: (Ord a) => [a] -> [a]
+> filterUnique = Set.toList . Set.fromList
 
 > optimizeSpindleDeflections =
 >     substdL 0 . substpi -- it not only optimize it also makes dL = 0
