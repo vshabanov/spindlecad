@@ -305,6 +305,12 @@ but we have problem of precise mounting for precise angles).
 >         printLine o
 >     putStrLn "done."
 
+> printLine (angles, (x1, y1, runout1), (x2, y2, runout2), maxRunout) = do
+>     mapM_ (printf "%5.0f ; " . evald) angles
+>     mapM_ (printf "%6.3f ; ") [x1, y1, x2, y2]
+>     mapM_ (printf "%5.3f ; ") [runout1, runout2]
+>     printf "%5.3f\n" maxRunout
+
 In search of optimum inner ring rotation angles combination
 we iterate over range of inner ring rotation angles and
 substitute run-out values by rotated vector coordinates.
@@ -349,6 +355,16 @@ and end of spindle shaft. Maximum run-out is used afterwards.
 >     o <- readIORef optimum
 >     return o
 
+> substRange var range sd = map (\ val -> (val, subst val)) range
+>     where subst val = substituteSpindleDeflectionsParams [(var, val)] sd
+
+> substAngleRange var tvec angleRange (sdx, sdy) =
+>       map (\ angle -> (angle, subst angle)) angleRange
+>     where vec = tupleToVector tvec
+>           subst angle = (substituteSpindleDeflectionsParams [(var, x rv)] sdx,
+>                          substituteSpindleDeflectionsParams [(var, y rv)] sdy)
+>               where rv = rotateVector (toRadians angle) vec
+
 In search optimum II we use the fact that in linear system console run-out can be
 calculated separately for each bearing run-out and then summed togethe.
 So we calculate console run-out vectors and then search the minimal total run-out
@@ -377,6 +393,9 @@ TODO: direct search of optimum angles is long. some optimization algorithm must 
 >         scan base vecs range =
 >             flip mapM_ (map (rotateAndSum base vecs) range)
 >
+>     --putStrLn ""
+>     --mapM_ print [vecsa, vecsb, vecsc, vecsd, vecse]
+>           
 >     optimum <- newIORef (undefined, undefined, undefined, 10000.0)
 >
 >     do scan vecsa vecsb halfRange $ \ (bAngle, sum) -> do
@@ -400,21 +419,34 @@ TODO: direct search of optimum angles is long. some optimization algorithm must 
 >     o <- readIORef optimum
 >     return o
 
-> printLine (angles, (x1, y1, runout1), (x2, y2, runout2), maxRunout) = do
->     mapM_ (printf "%5.0f ; " . evald) angles
->     mapM_ (printf "%6.3f ; ") [x1, y1, x2, y2]
->     mapM_ (printf "%5.3f ; ") [runout1, runout2]
->     printf "%5.3f\n" maxRunout
+Remark about optimum search:
 
-> substRange var range sd = map (\ val -> (val, subst val)) range
->     where subst val = substituteSpindleDeflectionsParams [(var, val)] sd
+In general when minimizing of two vector sums (with vectors constrained by the same
+rotation angles) we have many local minimums (at least in case of 3 and more angles).
 
-> substAngleRange var tvec angleRange (sdx, sdy) =
->       map (\ angle -> (angle, subst angle)) angleRange
->     where vec = tupleToVector tvec
->           subst angle = (substituteSpindleDeflectionsParams [(var, x rv)] sdx,
->                          substituteSpindleDeflectionsParams [(var, y rv)] sdy)
->               where rv = rotateVector (toRadians angle) vec
+For example, here first five lines from 5 bearing angles optimization (in ascending order
+from optimum), the last colum is maximum run-out achieved:
+0;120;240; 60;  0; -0.048 ;  0.026 ;  0.030 ;  0.054 ; 0.055 ; 0.062 ; 0.062
+0;150;240;330; 90;  0.067 ;  0.118 ; -0.047 ; -0.068 ; 0.136 ; 0.083 ; 0.136
+0;150;270;330; 90;  0.102 ;  0.109 ;  0.101 ; -0.108 ; 0.149 ; 0.148 ; 0.149
+0;150;210; 90;330;  0.153 ; -0.049 ; -0.148 ;  0.026 ; 0.161 ; 0.150 ; 0.161
+0;150;210;330; 90;  0.042 ;  0.144 ; -0.156 ;  0.041 ; 0.150 ; 0.161 ; 0.161
+
+As you can see the angles combinations are very different (they are not stay near each other).
+So we can't use gradient-like optimization methods for finding optimum. We will
+only find local optimum. The thing that could be done is to get from search space
+a some reasonable amount of start points and then perform gradient search.
+
+For now we simply scan search space at fixed step to find some minimum value
+from scanned points (and it's even not a local minium). Taking into account, that
+mounting bearing with angle not divisible by 30 (or at least 5) can be complicated,
+this approach is (temporarily) ok.
+
+When we add shaft runout, 6th bearing(?) or outer rings(?) we'll need more optimal search
+even if it doesn't give us global optimum.
+(especially with non-linear rigidity, when we need to solve system at each point, the search
+can become crucial).
+
 
 > dynamicReaction mass omega radius = mass *. square omega *. radius
 
