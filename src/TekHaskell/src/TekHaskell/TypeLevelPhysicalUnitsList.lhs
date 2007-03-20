@@ -123,6 +123,27 @@ Angle
 > radian = 1
 > degree = pi / 180
 
+Energy
+
+> type Joule = 
+>     Dimension (Succ One) One (Neg (Succ One)) Zero Zero Zero Zero
+> joule :: Value Joule
+> joule = newton *. meter
+
+Power
+
+> type Watt =
+>     Dimension (Succ One) One (Neg (Succ (Succ One))) Zero Zero Zero Zero
+> watt :: Value Watt
+> watt = joule /. second
+
+Electricity
+
+> type Volt =
+>     Dimension (Succ One) One (Neg (Succ (Succ One))) (Neg One) Zero Zero Zero
+> volt :: Value Volt
+> volt = watt /. ampere
+
 Unsorted
 
 > mm = milli meter
