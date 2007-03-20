@@ -8,7 +8,7 @@ stability:      experimental
 author:         Vladimir Shabanov
 homepage:       http://spindlecad.sourceforge.net
 package-url:    
-synopsis:       Machine tool spindle design and optimisation program.
+synopsis:       Machine tool spindle design and optimization program.
 description:
         See the http://spindlecad.sourceforge.net
 executable:     bin/SpindleCAD.exe
