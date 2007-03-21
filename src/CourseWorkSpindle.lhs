@@ -290,12 +290,18 @@ Optimal configuration may differ for different run-out sets
 we determine optimum more precisely and it's usuallt not same as for 30 degree step,
 but we have problem of precise mounting for precise angles).
 
+About bearing reactions. Reaction is usually 1+/-0.25 eccentricity * radial rigidity,
+where eccentricity is 1/2 radial runout.
+But it can be larger or smaller depending on runout values and spindle configuration.
+We can (very) roughly assume that maximum reaction is
+maximum radial runout * radial rigidity.
+
 > testSeparateInnerRingRotation = do
 >     --putStr "solving spindle ... "
 >     sd <- solveOptimizedSpindle (console <+> testSpindleWithRunouts)
 >     --putStrLn "ok"
 >
->     let runouts = [1.25, 1.75, 0.75,  1.0, 1.5]
+>     let runouts = [1.25, 1.25, 1.25, 1.25, 1.25] -- [1.25, 1.75, 0.75,  1.0, 1.5]
 >         permutedRunouts = [front ++ rear |
 >                            front <- filterUnique $ permutations (take 3 runouts),
 >                            rear  <- filterUnique $ permutations (drop 3 runouts)]
@@ -303,11 +309,21 @@ but we have problem of precise mounting for precise angles).
 >         mapM_ (printf "%4.2f ; " . evald) runouts
 >         o <- searchOptimum2 sd runouts
 >         printLine o
+>	  print $ totalBearingReactions
+>	    $ substAnglesAndRunouts
+>	        ["roa", "rob", "roc", "rod", "roe"]
+>	        (optimumAngles o)
+>	        runouts
+>	        sd
+>	  print $ map (\(b,l,r) -> evald $ radialRigidity b /. (newton /. micro meter))
+>	              (getBearingReactions sd)
 >     putStrLn "done."
+
+> optimumAngles (angles, _, _, _) = angles
 
 > printLine (angles, (x1, y1, runout1), (x2, y2, runout2), maxRunout) = do
 >     mapM_ (printf "%5.0f ; " . evald) angles
->     mapM_ (printf "%6.3f ; ") [x1, y1, x2, y2]
+>     -- mapM_ (printf "%6.3f ; ") [x1, y1, x2, y2]
 >     mapM_ (printf "%5.3f ; ") [runout1, runout2]
 >     printf "%5.3f\n" maxRunout
 
@@ -359,14 +375,28 @@ and end of spindle shaft. Maximum run-out is used afterwards.
 >     where subst val = substituteSpindleDeflectionsParams [(var, val)] sd
 
 > substAngleRange var tvec angleRange (sdx, sdy) =
->       map (\ angle -> (angle, subst angle)) angleRange
+>       map (\ angle -> (angle, substAngle var tvec angle (sdx, sdy))) angleRange
+
+> substAngle var tvec angle (sdx, sdy) =
+>       (substituteSpindleDeflectionsParams [(var, x rv)] sdx,
+>        substituteSpindleDeflectionsParams [(var, y rv)] sdy)
 >     where vec = tupleToVector tvec
->           subst angle = (substituteSpindleDeflectionsParams [(var, x rv)] sdx,
->                          substituteSpindleDeflectionsParams [(var, y rv)] sdy)
->               where rv = rotateVector (toRadians angle) vec
+>           rv = rotateVector (toRadians angle) vec
+
+> substAnglesAndRunouts vars angles runouts sd =
+>     foldl (\ (sdx, sdy) (var, angle, runout) ->
+>             substAngle var (runout, 0) angle (sdx, sdy))
+>       (sd, sd)
+>       (zip3 vars angles runouts)
+
+> totalBearingReactions (sdx, sdy) =
+>     map (\ ((b1, l1, r1), (b2, l2, r2)) ->
+>            sqrt $ evald $ (r1*.r1 +. r2*.r2) /. square newton)
+>        $ zip (getBearingReactions sdx)
+>              (getBearingReactions sdy)
 
 In search optimum II we use the fact that in linear system console run-out can be
-calculated separately for each bearing run-out and then summed togethe.
+calculated separately for each bearing run-out and then summed together.
 So we calculate console run-out vectors and then search the minimal total run-out
 by rotation of calculated vectors, not by rotating run-outs and calculating console
 run-out after.
@@ -418,6 +448,8 @@ TODO: direct search of optimum angles is long. some optimization algorithm must 
 >            do return ()
 >     o <- readIORef optimum
 >     return o
+
+
 
 Remark about optimum search:
 
