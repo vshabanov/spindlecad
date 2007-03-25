@@ -146,6 +146,7 @@ Electricity
 
 Unsorted
 
+> inch = 25.4 .* mm
 > mm = milli meter
 > cm = centi meter
 > kN = kilo newton
