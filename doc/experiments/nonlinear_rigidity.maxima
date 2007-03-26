@@ -1,0 +1,44 @@
+/* -*- coding: cp1251 -*- */
+
+d : k * F^a;
+
+ja : F/d;
+
+k*((F + Fv)^a - Fv^a) = d
+  d = 1mum, F = ja * 1mum =>
+k*((ja + Fv)^a - Fv^a)=1
+
+
+tomin(Fv_i, ja_i) := (k*((ja_i + Fv_i)^a - Fv_i^a) - 1)^2;
+
+minsum : tomin(283, 768/10) + tomin(931, 1319/10) + tomin(1923, 1917/10);
+
+/* unconstrained BFGS minimization */
+load (lbfgs);
+estimates : lbfgs(minsum, [k, a], [0, 1], 1e-4, [-1,0]);
+
+j_at(k, a, Fv) := find_root(k*((R + Fv)^a - Fv^a)-1, R, 1, 10000);
+/* j_at_(k, a, Fv) := solve(k*((R + Fv)^a - Fv^a)=1, R); */
+/* float(last(j_at_s(0.45, 0.505, 283))); */
+
+js(f) := j_at(rhs(estimates[1]), rhs(estimates[2]), f);
+
+map(js, [283, 931, 1923]);
+
+
+
+/* dsk : diff(minsum, k); */
+
+/* dsa : diff(minsum, a); */
+
+/*  mnewton не работает как и solve */
+
+/* load("mnewton"); */
+/* mnewton([dsk, dsa], [k, a], [1, 1]); */
+
+/* solve([dsk=0, dsa=0], [k, a]); */
+
+/* plot3d(minsum, [a, 0.5, 0.51], [k, 0.43, 0.47], [gnuplot_preamble, "set zrange [0.0003:0.0004]"], [grid, 100, 100]); */
+
+/* plot2d(0.45*F^0.5,[F,0,1500]); */
+
