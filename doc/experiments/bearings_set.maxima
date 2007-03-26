@@ -32,6 +32,12 @@ minsum : sum(tomin(b[pl][1], b[pl][2]), pl, 1, 3);
 load (lbfgs);
 estimates : lbfgs(minsum, [k, a], [0, 1], 1e-4, [-1,0]);
 
+plot2d([1, k*(F/3)^a, k*((b[1][1]+(F/3))^a-b[1][1]^a), k*((b[2][1]+F/3)^a-b[2][1]^a), k*((b[3][1]+F/3)^a-b[3][1]^a)], [F, 0, 800], [gnuplot_preamble, "set size 1.25, 1.30; set nokey"], [gnuplot_term, ps], [gnuplot_out_file, "c:/B7015.radial.eps"]);
+
+plot2d([1, k*(F)^a, k*((b[1][1]+(F))^a-b[1][1]^a), k*((b[2][1]+F)^a-b[2][1]^a), k*((b[3][1]+F)^a-b[3][1]^a)], [F, 0, 2000], [gnuplot_preamble, "set size 1.25, 1.30; set nokey"], [gnuplot_term, ps], [gnuplot_out_file, "c:/B7015.axial.eps"]);
+
+plot2d([1, F/ja(F), F/ja(b[1][1]+F)-F/ja(b[1][1])], [F, 0, 1923]);
+
 j_at(k, a, Fv) := find_root(k*((R + Fv)^a - Fv^a)-1, R, 1, 10000);
 /* j_at_(k, a, Fv) := solve(k*((R + Fv)^a - Fv^a)=1, R); */
 /* float(last(j_at_s(0.45, 0.505, 283))); */
