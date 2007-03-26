@@ -317,6 +317,15 @@ maximum radial runout * radial rigidity.
 >	        sd
 >	  print $ map (\(b,l,r) -> evald $ radialRigidity b /. (newton /. micro meter))
 >	              (getBearingReactions sd)
+>	      
+>     let b1 = findBearingByCode "B7015C.T.P4S"
+>         b2 = findBearingByCode "B7012C.T.P4S"
+>         spindle = console <+> testSpindleConstructor 1 0 b1 b2 [0,0..]
+>     baseSsd <- solveOptimizedSpindle spindle
+>     let baseS = substdL 0 baseSsd
+>     print $ 1000 / deflectionAt (0.*mm) baseS
+>     print $ 1000 / deflectionAt consoleLength baseS
+>    
 >     putStrLn "done."
 
 > optimumAngles (angles, _, _, _) = angles
@@ -479,6 +488,49 @@ even if it doesn't give us global optimum.
 (especially with non-linear rigidity, when we need to solve system at each point, the search
 can become crucial).
 
+
+Rigidity, Optimal positions, Reactions.
+
+j_r * [0.84-0.84-1.16 //\  1.0-1.0 /\]
+  j_r at flange  = 151.1 N/mum
+  j_r at console = 46.2 N/mum  (console length = 300 mm)
+
+     1.25 ; 1.25 ; 1.25 ; 1.25 ; 1.25 ; eccentricity
+     193.6, 193.6, 267.3, 193.5, 193.5; j_r
+
+  step = 30 deg (r_c = 0.085; r_f = 0.117; r_max = 0.117)
+        0 ;   90 ;  210 ;   30 ;   30 ; position
+    [241.7, 212.4, 367.6,  46.7,  22.4] R_i
+     
+  step = 10 deg (r_c = 0.042; r_f = 0.029; r_max = 0.042)
+        0 ;  110 ;  230 ;   70 ;  350 ; position
+    [245.7, 235.7, 338.9, 167.3, 145.6] R_i
+
+  step =  5 deg (r_c = 0.031; r_f = 0.026; r_max = 0.031)
+        0 ;  110 ;  225 ;    0 ;   75 ; position
+    [247.7, 235.9, 337.0, 160.0, 138.4] R_i
+
+
+j_r * [1.0-1.0-1.0 //\  1.0-1.0 /\]
+TBT set with DB rigidity (WRONG!!!)
+  j_r at flange  = 162.4 N/mum
+  j_r at console = 48.7 N/mum
+
+     1.25 ; 1.25 ; 1.25 ; 1.25 ; 1.25 ; eccentricity
+     230.4, 230.4, 230.4, 193.5, 193.5; j_r
+
+  step = 30 deg (r_c = 0.055; r_f = 0.062; r_max = 0.062)
+        0 ;  120 ;  240 ;   60 ;    0 ; position
+    [277.2, 282.5, 311.2, 133.7, 112.4] R_i
+
+  step = 10 deg (r_c = 0.033; r_f = 0.022; r_max = 0.033)
+        0 ;  130 ;  240 ;   70 ;  350 ; position
+    [290.3, 282.8, 295.4, 167.6, 144.6] R_i    
+
+  step =  5 deg (r_c = 0.026; r_f = 0.018; r_max = 0.026)
+        0 ;  135 ;  245 ;   75 ;  345 ; position
+    [289.8, 289.3, 286.9, 184.4, 158.2] R_i
+     
 
 > dynamicReaction mass omega radius = mass *. square omega *. radius
 
@@ -643,12 +695,12 @@ Spindle description construction.
 >     `modify` (if f == 0 then (\s _ -> s) else addRadialForce (f.*newton)) `at` 0.*mm
 >     `modify` (if offset == 0 then (\s _ -> s) else addBendingMoment ((f*offset).*newton*.meter)) `at` 1.*mm
 >     -- front bearing set
->     `modify` addBearing' b1 MountLeft  (ro!!0) `at` (44+27+0.5*wd1).*mm
->     `modify` addBearing' b1 MountLeft  (ro!!1) `at` (44+47+1.5*wd1).*mm
->     `modify` addBearing' b1 MountRight (ro!!2) `at` (44+79+2.5*wd1).*mm
+>     `modify` addBearing' b1_1st MountLeft  (ro!!0) `at` (44+27+0.5*wd1).*mm
+>     `modify` addBearing' b1_2nd MountLeft  (ro!!1) `at` (44+47+1.5*wd1).*mm
+>     `modify` addBearing' b1_3rd MountRight (ro!!2) `at` (44+79+2.5*wd1).*mm
 >     -- rear bearing set
->     `modify` addBearing' b2 MountLeft  (ro!!3) `at` (281.5+31+3*wd1+0.5*wd2).*mm
->     `modify` addBearing' b2 MountRight (ro!!4) `at` (281.5+49+3*wd1+1.5*wd2).*mm)
+>     `modify` addBearing' b2_1st MountLeft  (ro!!3) `at` (281.5+31+3*wd1+0.5*wd2).*mm
+>     `modify` addBearing' b2_2nd MountRight (ro!!4) `at` (281.5+49+3*wd1+1.5*wd2).*mm)
 >     -- section where dL is added to length
 >     `modify` (\ s _ -> s { sectionLength = sectionLength s
 >                                   +. Symbol "dL" .* meter 
@@ -658,6 +710,12 @@ Spindle description construction.
 >   where cyl d l = cylinder (d.*mm) (l.*mm)
 >         wd1 = (width b1 -. width fagB7015C) /. mm
 >         wd2 = (width b2 -. width fagB7012C) /. mm
+>	  scaleRR s b = b { radialRigidity = s .* radialRigidity b }
+>         b1_1st = scaleRR 0.84 b1
+>         b1_2nd = scaleRR 0.84 b1
+>         b1_3rd = scaleRR 1.16 b1
+>         b2_1st = b2
+>         b2_2nd = b2
 >         fagB7015C = findBearingByCode "B7015C.T.P4S"
 >         fagB7012C = findBearingByCode "B7012C.T.P4S"
 
