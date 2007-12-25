@@ -23,7 +23,7 @@ Interface to Maxima computer algebra system.
 > module TekHaskell.Maxima (
 >     Interpreter,
 >     withInterpreter,
->     eval,
+>     eval, testCase,
 >     debugEval -- same as eval but prints Maxima I/O
 >   ) where
 
@@ -391,12 +391,9 @@ Symbol <=> Maxima symbol conversion routines.
 Simple test case
 
 > testCase = withInterpreter $ \i -> do
->     a <- eval i (subst [("x", Integer 111)] $
->                  solve [diffn (Expt (Symbol "x") (Integer 3)) "x" 1
->                         `Equal` Integer (-12),
+>     a <- eval i (solve [diffn (Expt (Symbol "x") (Integer 3)) "x" 1
+>                         `Equal` Integer (12),
 >                         (Symbol "x" `Plus` Symbol "y") `Equal` Integer 10
 >                        ]
 >                  ["x", "y"])
->     print $ substitute (Map.fromList [("A", Integer 4),
->                                       ("B", Integer 2),
->                                       ("C", Integer 1)]) a
+>     print $  a
