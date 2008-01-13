@@ -28,5 +28,5 @@ exposed-modules:
 other-modules:
         TekHaskell.ThirdParty.Era
 hs-source-dirs: src
-build-depends:  haskell98, base, parsec
+build-depends:  haskell98, base, parsec, containers, bytestring, process
 ghc-options:    -O2
