@@ -39,6 +39,7 @@ List of FAG hi-precision spindle bearings and their parameters
 List of all bearings from catalogue
 
 > bearingsList =
+>     fagNN3020ASK : -- added manually below
 >     map (\ s -> case parse bearingStringParser "" s of
 >                     Left err -> error $ "Can't parse bearing description: "
 >                                         ++ s ++ ":" ++ show err
@@ -294,3 +295,30 @@ Tolerances. Spindle bearings. Tolerance class P4S.
 >     if d <= dOver then error "findByDiameter: diameter too small"
 >     else if d <= dIncl then r
 >     else findByDiameter xs d
+
+NN3020ASK.M.SP Cylindrical roller bearing
+
+> fagNN3020ASK =
+>     Bearing { manufacturer = "FAG",
+>               code = "NN3020ASK.M.SP",
+>               designation = "NN3020ASK.M.SP",
+>               bearingType = "Cylindrical roller bearing, double row. Lips on inner ring. Outer ring lipless.",
+>               dimensionSeries = MediumDimensionSeries,
+>               contactAngle = 0,
+>               innerDiameter = 100 .* milli meter,
+>               outerDiameter = 150 .* milli meter,
+>               width = 37 .* milli meter,
+>               attainableSpeedGrease = 5300 .* rpm,
+>               attainableSpeedOil = 6300 .* rpm,
+>               radialRigidity = 2170 .* newton /. micro meter,
+>               axialRigidity = 0 .* newton /. micro meter,
+>               cdyn = 146 .* kN,
+>               c0stat = 245 .* kN,
+>               innerRingRadialRunout = 5 .* micro meter, -- (p.146)
+>               outerRingRadialRunout = 8 .* micro meter, -- (p.146)
+>               bearingDrawing = EmptyDrawing
+>             }
+
+ For 100 mm nominal bore diameter:
+   Bearing clearange -- min 10, max 30 mum (p.149)
+   

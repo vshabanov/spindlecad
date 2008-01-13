@@ -1,5 +1,5 @@
 --
---  Copyright (C) 2007 Vladimir Shabanov
+--  Copyright (C) 2008 Vladimir Shabanov
 --
 --  This file is part of SpindleCAD.
 --
@@ -44,14 +44,11 @@ but for deflection calculation it's OK.
 > main = testSeparateInnerRingRotation --scanBearings --drawRunouts
 
 > drawBaseSpindle = withInterpreter $ \i -> do
->     let sd = substpi $ spindleDeflections spindle
->         b1 = findBearingByCode "B7015C.T.P4S"--"B71917C.T.P4S""B71818C.TPA.P4"
->         b2 = findBearingByCode "B7012C.T.P4S"
->         spindle = testSpindleConstructor 1 0 b1 b2 [0,0..]
+>     let sd = substpi $ spindleDeflections mk7702Spindle
 >     baseSsd <- solveSpindleDeflections i sd
 >     let baseS = substdL 0 baseSsd
 >     exportToACAD (substituteDrawing (Map.fromList [("dL",0)]) $
->                   spindleDrawing spindle) "C:/base-spindle.lsp"
+>                   spindleDrawing mk7702Spindle) "C:/base-spindle.lsp"
 >     exportToACAD (deflectionLine (10 .* mm /. nano meter) baseS)
 >                  "C:/base-spindle-deflections.lsp"
 
@@ -296,15 +293,16 @@ But it can be larger or smaller depending on runout values and spindle configura
 We can (very) roughly assume that maximum reaction is
 maximum radial runout * radial rigidity.
 
+
 > testSeparateInnerRingRotation = do
->     --putStr "solving spindle ... "
+>     putStr "solving spindle ... "
 >     sd <- solveOptimizedSpindle (console <+> testSpindleWithRunouts)
->     --putStrLn "ok"
+>     putStrLn "ok"
 >
->     let runouts = [1.25, 1.25, 1.25, 1.25, 1.25] -- [1.25, 1.75, 0.75,  1.0, 1.5]
+>     let runouts = [1.25, 1.25, 1.25, 2.5, 0.0] -- [1.25, 1.75, 0.75,  1.0, 1.5]
 >         permutedRunouts = [front ++ rear |
 >                            front <- filterUnique $ permutations (take 3 runouts),
->                            rear  <- filterUnique $ permutations (drop 3 runouts)]
+>                            rear  <- {-filterUnique $ permutations-} [drop 3 runouts]]
 >     flip mapM_ permutedRunouts $ \ runouts -> do
 >         mapM_ (printf "%4.2f ; " . evald) runouts
 >         o <- searchOptimum2 sd runouts
@@ -318,10 +316,9 @@ maximum radial runout * radial rigidity.
 >	  print $ map (\(b,l,r) -> evald $ radialRigidity b /. (newton /. micro meter))
 >	              (getBearingReactions sd)
 >	      
->     let b1 = findBearingByCode "B7015C.T.P4S"
->         b2 = findBearingByCode "B7012C.T.P4S"
->         spindle = console <+> testSpindleConstructor 1 0 b1 b2 [0,0..]
->     baseSsd <- solveOptimizedSpindle spindle
+>     putStr "solving spindle with console ... "
+>     baseSsd <- solveOptimizedSpindle $ console <+> mk7702Spindle
+>     putStrLn "ok"
 >     let baseS = substdL 0 baseSsd
 >     print $ 1000 / deflectionAt (0.*mm) baseS
 >     print $ 1000 / deflectionAt consoleLength baseS
@@ -335,50 +332,6 @@ maximum radial runout * radial rigidity.
 >     -- mapM_ (printf "%6.3f ; ") [x1, y1, x2, y2]
 >     mapM_ (printf "%5.3f ; ") [runout1, runout2]
 >     printf "%5.3f\n" maxRunout
-
-In search of optimum inner ring rotation angles combination
-we iterate over range of inner ring rotation angles and
-substitute run-out values by rotated vector coordinates.
-To get console run-out we use two independent spindle deflections values
-for X0Z and for Y0Z planes.
-Also we use additional console to get runouts at two points: end of longest part
-and end of spindle shaft. Maximum run-out is used afterwards.
-
-> searchOptimum sd [roa, rob, roc, rod, roe] = do
->     let range = [0,30..330]
->         halfRange = takeWhile (<= 180) range
->
->     optimum <- newIORef (undefined, undefined, undefined, 10000.0)
->     --n <- newIORef (1::Integer)
->
->     do flip mapM_ (substAngleRange "roa" (roa,0) [0] (sd,sd))   $ \ (_, sdxsdy) -> do
->        flip mapM_ (substAngleRange "rob" (rob,0) halfRange sdxsdy) $ \ (bAngle, sdxsdy) -> do
->        flip mapM_ (substAngleRange "roc" (roc,0) range sdxsdy)  $ \ (cAngle, sdxsdy) -> do
->        flip mapM_ (substAngleRange "rod" (rod,0) range sdxsdy)  $ \ (dAngle, sdxsdy) -> do
->        flip mapM_ (substAngleRange "roe" (roe,0) range sdxsdy)  $ \ (eAngle, (sdx,sdy)) -> do
->         let x1 = evald $ getSpindleDeflection sdx (0.*mm) /. micro meter
->             y1 = evald $ getSpindleDeflection sdy (0.*mm) /. micro meter
->             x2 = evald $ getSpindleDeflection sdx consoleLength /. micro meter
->             y2 = evald $ getSpindleDeflection sdy consoleLength /. micro meter
->             runout1 = sqrt $ x1*x1 + y1*y1
->             runout2 = sqrt $ x2*x2 + y2*y2
->             maxRunout = max runout1 runout2
->             line = ([0, bAngle, cAngle, dAngle, eAngle],
->                     (x1, y1, runout1),
->                     (x2, y2, runout2),
->                     maxRunout)
->         (_, _, _, minRunout) <- readIORef optimum
->         if maxRunout < minRunout
->          then
->            do modifyIORef optimum (\ _ -> line)
->          else
->            do return ()
->         --curn <- readIORef n
->         --printf "%5d ; " curn
->         --modifyIORef n (+ 1)
->         --printLine line
->     o <- readIORef optimum
->     return o
 
 > substRange var range sd = map (\ val -> (val, subst val)) range
 >     where subst val = substituteSpindleDeflectionsParams [(var, val)] sd
@@ -518,29 +471,6 @@ j_r * [1.0/  1.0/  1.0\   1.0/  1.0\]  (TBT set with DB rigidity -- WRONG!!!)
    5 deg   0  135  245   75  345   289.8  289.3  286.9  184.4  158.2  0.026 0.018 0.026
      
 
-> dynamicReaction mass omega radius = mass *. square omega *. radius
-
-For our test spindle (18kg shaft, 7000rpm max, 1.25mum eccentricity) the dynamic reaction
-is only 12N, while one front bearing radial rigidity is 230.4N/mum. So dynamic reaction
-is pretty small in comparison with static reaction (I think that in real constructions
-center of mass eccentricity is much bigger than geometrical shaft axis eccentricity).
-
-*Main> eval $ dynamicReaction (18.*kilogram) ((2*pi*7000).*rpm) (1.25.*micro meter) /. newton
-12.090265391334462
-*Main> eval $ (radialRigidity $ findBearingByCode "B7015C.T.P4S") /. (newton /. micro meter)
-230.4
-
-little conclusion about dynamicReaction:
-The minimizing of spindle shaft runout has nothing to do with minimizing of
-bearings dynamic reaction. In high speed cutting (for example, for 30000rpm
-the reaction is 222N) it can possibly help in minimising such reaction.
-But we can diminish dynamic reaction simply by moving center of mass,
-e.g. by drilling some metal off the shaft. And this method work for any RPM
-and any axial displacement.
-Although the minimizing of run-out decreases dynamic reaction, the real problem
-with dynamic reaction is problems with unprecise shaft, not bearings.
-
-
 Evaluation utilities.
 
 > permutations [] = [[]]
@@ -570,13 +500,13 @@ Additional console
 Test spindle without forces and with runouts as symbols.
 The runout symbol can be substituted after with micro meters using substRunouts
 
-> testSpindleWithRunouts = testSpindleConstructor 0 0 fagB7015C fagB7012C runouts
->   where fagB7015C = (findBearingByCode "B7015C.T.P4S")
->                     { innerRingRadialRunout = 1 .* micro meter 
->                     }
->         fagB7012C = (findBearingByCode "B7012C.T.P4S")
->                     { innerRingRadialRunout = 1 .* micro meter 
->                     }
+> testSpindleWithRunouts = testSpindleConstructor 0 0 b1 b2 runouts
+>     where b1 = frontBearing
+>                { innerRingRadialRunout = 1 .* micro meter 
+>                }
+>           b2 = rearBearing
+>                { innerRingRadialRunout = 1 .* micro meter 
+>                }
 
 Runouts symbols
 
@@ -662,48 +592,68 @@ Output helpers.
 
 Spindle description construction.
 
-> testSpindle = testSpindleConstructor 1 0 fagB7015C fagB7012C [0,0,0,0,0]
->   where fagB7015C = findBearingByCode "B7015C.T.P4S"
->         fagB7012C = findBearingByCode "B7012C.T.P4S"
+> fagB71922E = findBearingByCode "B71922E.T.P4S"
+> fagNN3020  = findBearingByCode "NN3020ASK.M.SP"
+> frontBearing = fagB71922E
+> rearBearing  = fagNN3020
 
-> testSpindleConstructor f offset b1 b2 ro =
+> mk7702Spindle = spindleConstructorMK7702 1 0 frontBearing rearBearing [0,0,0,0]
+
+> testSpindleConstructor = spindleConstructorMK7702
+> testSpindle = mk7702Spindle
+
+> spindleConstructorMK7702 consoleForce forceOffset b1 b2 ro =
 >     -- shaft
->     (((cyl 82 13 <+> cyl 133 23 <+> cyl 120 8
->       -- <+> cyl (innerDiameter b1 /. mm) (147.5+3*wd1)
->       <+> cyl (innerDiameter b1 /. mm) (100+3*wd1)
->       <+> cyl (innerDiameter b1 /. mm) (47.5) -- dL here
->       <+> cyl 67 90
->       <+> cyl (innerDiameter b2 /. mm) (62.5+2*wd2)
->       <+> cyl 57 96)
+>     ((cyl 106 14 <+> cyl 170 29 <+> cyl 150 9
+>       <+> cyl 117 19
+>       <+> cyl (innerDiameter b1 /. mm) (3 * w1 + spacer + gaika1)
+>       <+> cyl 107.5
+>           (348.5 -- + Symbol "dL"
+>            - (2 * w1 + spacer + gaika1 + vtulka2 + (width b2 /. mm)/2))
+>       <+> cyl (w2 / 12     + innerDiameter b2 /. mm) vtulka2
+>       <+> cyl (w2 / 12 / 2 + innerDiameter b2 /. mm) w2
+>       <+> cyl (innerDiameter b2 /. mm) 79
+>       <+> cyl 95 6
+>       <+> cyl 97 (109+35)
+>       <+> cyl 92 8
+>       <+> cyl 97 16)
 >      `cut`
->      (cyl 55 30 <+> cyl 45 73 <+> cyl 35 (337+3*wd1+2*wd2)))
+>      (cyl 109 81 <+> cyl 74 (711 - 81))
+>      )
 >     -- forces
->     `modify` (if f == 0 then (\s _ -> s) else addRadialForce (f.*newton)) `at` 0.*mm
->     `modify` (if offset == 0 then (\s _ -> s) else addBendingMoment ((f*offset).*newton*.meter)) `at` 1.*mm
+>     `modifyIf` (consoleForce /= 0, addRadialForce (consoleForce.*newton) `at` 0.*mm)
+>     `modifyIf` (forceOffset  /= 0, addBendingMoment ((consoleForce*forceOffset).*newton*.meter) `at` 1.*mm)
 >     -- front bearing set
->     `modify` addBearing' b1_1st MountLeft  (ro!!0) `at` (44+27+0.5*wd1).*mm
->     `modify` addBearing' b1_2nd MountLeft  (ro!!1) `at` (44+47+1.5*wd1).*mm
->     `modify` addBearing' b1_3rd MountRight (ro!!2) `at` (44+79+2.5*wd1).*mm
->     -- rear bearing set
->     `modify` addBearing' b2_1st MountLeft  (ro!!3) `at` (281.5+31+3*wd1+0.5*wd2).*mm
->     `modify` addBearing' b2_2nd MountRight (ro!!4) `at` (281.5+49+3*wd1+1.5*wd2).*mm)
->     -- section where dL is added to length
->     `modify` (\ s _ -> s { sectionLength = sectionLength s
->                                   +. Symbol "dL" .* meter 
->                                 })
->              `at` ((44+100+3*wd1+1).*mm) 
+>     `modify` addBearing' b1_1st MountLeft  (ro!!0) `at` (14+77-0.5*w1).*mm
+>     `modify` addBearing' b1_2nd MountLeft  (ro!!1) `at` (14+77+0.5*w1).*mm
+>     `modify` addBearing' b1_3rd MountRight (ro!!2) `at` (14+77+spacer+1.5*w1).*mm
+>     -- rear bearing 
+>     --`modify` addBearing' b2     MountLeft  (ro!!3) `at` (14+77+348.5).*mm
+>     --`modify` addBearing' b2_2     MountLeft  (ro!!3) `at` (14+77+348.5-9).*mm
+>     --`modify` addBearing' b2_2     MountLeft  (ro!!3) `at` (14+77+348.5+9).*mm
+>     `modify` addBearing' b2_4     MountLeft  (ro!!3) `at` (14+77+348.5-9-11/2).*mm
+>     `modify` addBearing' b2_4     MountLeft  (ro!!3) `at` (14+77+348.5-9+11/2).*mm
+>     `modify` addBearing' b2_4     MountLeft  (ro!!3) `at` (14+77+348.5+9-11/2).*mm
+>     `modify` addBearing' b2_4     MountLeft  (ro!!3) `at` (14+77+348.5+9+11/2).*mm
 >     -- end
 >   where cyl d l = cylinder (d.*mm) (l.*mm)
->         wd1 = (width b1 -. width fagB7015C) /. mm
->         wd2 = (width b2 -. width fagB7012C) /. mm
->	  scaleRR s b = b { radialRigidity = s .* radialRigidity b }
+>         spacer = 10
+>         gaika1 = 43 -- gaika+vtulka
+>         vtulka2 = 15
+>         w1 = width b1 /. mm
+>         w2 = width b2 /. mm
+>         -- width difference compared to initial spindle
+>         --wd1 = (width b1 -. width fagB7015C) /. mm
+>         --wd2 = (width b2 -. width fagB7012C) /. mm
+>         -- we can scale radial rigidity to account that bearings are
+>         -- loaded differently in TBT set //\ - 0.84/0.84/1.16\
+>         realScaleRR s b = b { radialRigidity = s .* radialRigidity b }
+>         scaleRR s b = b -- no scale
 >         b1_1st = scaleRR 0.84 b1
 >         b1_2nd = scaleRR 0.84 b1
 >         b1_3rd = scaleRR 1.16 b1
->         b2_1st = b2
->         b2_2nd = b2
->         fagB7015C = findBearingByCode "B7015C.T.P4S"
->         fagB7012C = findBearingByCode "B7012C.T.P4S"
+>         b2_2 = realScaleRR 0.5 b2
+>         b2_4 = realScaleRR 0.25 b2
 
 
 

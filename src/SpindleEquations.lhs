@@ -105,11 +105,17 @@ Therefore `cone` is now commented.
 Spindle description modification.
 Usage: spindle `modify` addSomething ... `at` ... .* mm
                ...
-               `modify` addSomething ... `at` ... .* mm 
+               `modify` addSomething ... `at` ... .* mm
+               ...
+               `modifyIf` (True, addSomething ... `at` ... .* mm)
 
 > modify :: Spindle -> ((Section -> Value Meter -> Section), Value Meter)
 >        -> Spindle
 > modify s (f, c) = modifySectionAt f s c
+
+> modifyIf :: Spindle -> (Bool, ((Section -> Value Meter -> Section), Value Meter))
+>          -> Spindle
+> modifyIf s (p, (f, c)) = if p then modifySectionAt f s c else s
 
 Something `at` specified coordinate description.
 
@@ -177,6 +183,11 @@ The cut part is drawn using HiddenLine.
 >                                         (sectionDrawing bore)
 >                    }
 
+Spindle length calculation
+
+> spindleLength :: Spindle -> Value Meter
+> spindleLength sections = foldl (+.) (0.*meter) $ map sectionLength sections
+
 Makes spindle shaft rigidity millon times greater than those steel,
 i.e. makes shaft practically absolutely rigid.
 TODO: This function was initially indroduced to determine what part of
@@ -195,6 +206,7 @@ Fixities for construction functions and operators
 > infixr 6 <+>                  -- same fixity as +, but right associative
 > infixl 5 `cut`                -- same fixity as ++, but left associative
 > infixl 5 `modify`             -- same fixity as ++, but left associative
+> infixl 5 `modifyIf`           -- same fixity as ++, but left associative
 
 
 Spindle construction functions utilities.
