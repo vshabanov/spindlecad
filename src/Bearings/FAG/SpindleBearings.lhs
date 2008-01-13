@@ -316,7 +316,7 @@ NN3020ASK.M.SP Cylindrical roller bearing
 >               c0stat = 245 .* kN,
 >               innerRingRadialRunout = 5 .* micro meter, -- (p.146)
 >               outerRingRadialRunout = 8 .* micro meter, -- (p.146)
->               bearingDrawing = EmptyDrawing
+>               bearingDrawing = Circle NormalLine (Point (0.*mm) (0.*mm)) (10.*mm)
 >             }
 
  For 100 mm nominal bore diameter:
