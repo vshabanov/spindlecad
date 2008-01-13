@@ -484,9 +484,14 @@ i.e. A0...A3 become (prefix++A0...) and all reactions become prefixR1,2,...
 >     where l acc [] = acc
 >           l acc ((len, _):xs) = l (acc +. len) xs
 
-> getBearingReactions :: SpindleDeflections
->                     -> [(Bearing, Value Meter, Value Newton)]
-> getBearingReactions sd = br (0.*mm) sd
+Bearing reaction type, contains bearings, its position and reaction
+
+> type BearingReaction = (Bearing, Value Meter, Value Newton)
+
+List of bearging reactions
+
+> bearingReactions :: SpindleDeflections -> [BearingReaction]
+> bearingReactions sd = br (0.*mm) sd
 >     where br l [] = []
 >           br l ((len, (sec, defls)):xs) =
 >               map (\ (pos, (ms,b)) -> (b, l+.pos,
@@ -500,6 +505,21 @@ i.e. A0...A3 become (prefix++A0...) and all reactions become prefixR1,2,...
 >                       (Map.toAscList $ bearings sec)
 >               ++
 >               br (l +. len) xs
+
+The same as bearingReactions but uses two spindle deflections for X0Y & X0Z planes
+and gives total reactions
+
+> totalBearingReactions :: (SpindleDeflections, SpindleDeflections)
+>                       -> [BearingReaction]
+> totalBearingReactions (sdy, sdz) =
+>     map (uncurry totalReaction) $ zip (bearingReactions sdy)
+>                                       (bearingReactions sdz)
+
+> totalReaction :: BearingReaction -> BearingReaction -> BearingReaction
+> totalReaction (b1, l1, r1) (b2, l2, r2) = (b1, l1, reaction)
+>     where reaction = (sqrt (r1'^2 + r2'^2)) .* newton
+>           r1' = r1 /. newton
+>           r2' = r2 /. newton
 
 Spindle equation system generation.
 
