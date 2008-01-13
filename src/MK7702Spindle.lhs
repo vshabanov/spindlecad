@@ -711,14 +711,15 @@ Spindle description construction.
 >     `modify` addBearing' b1_1st MountLeft  (ro!!0) `at` (14+77-0.5*w1).*mm
 >     `modify` addBearing' b1_2nd MountLeft  (ro!!1) `at` (14+77+0.5*w1).*mm
 >     `modify` addBearing' b1_3rd MountRight (ro!!2) `at` (14+77+spacer+1.5*w1).*mm
+>     --`modify` addBearing' b1_3rd MountRight (ro!!2) `at` (14+77+{-spacer+-}1.5*w1).*mm
 >     -- rear bearing 
->     --`modify` addBearing' b2     MountLeft  (ro!!3) `at` (14+77+348.5).*mm
+>     `modify` addBearing' b2     MountLeft  (ro!!3) `at` (14+77+348.5).*mm
 >     --`modify` addBearing' b2_2     MountLeft  (ro!!3) `at` (14+77+348.5-9).*mm
 >     --`modify` addBearing' b2_2     MountLeft  (ro!!3) `at` (14+77+348.5+9).*mm
->     `modify` addBearing' b2_4     MountLeft  (ro!!3) `at` (14+77+348.5-9-11/2).*mm
->     `modify` addBearing' b2_4     MountLeft  (ro!!3) `at` (14+77+348.5-9+11/2).*mm
->     `modify` addBearing' b2_4     MountLeft  (ro!!3) `at` (14+77+348.5+9-11/2).*mm
->     `modify` addBearing' b2_4     MountLeft  (ro!!3) `at` (14+77+348.5+9+11/2).*mm
+>     --`modify` addBearing' b2_4     MountLeft  (ro!!3) `at` (14+77+348.5-9-11/2).*mm
+>     --`modify` addBearing' b2_4     MountLeft  (ro!!3) `at` (14+77+348.5-9+11/2).*mm
+>     --`modify` addBearing' b2_4     MountLeft  (ro!!3) `at` (14+77+348.5+9-11/2).*mm
+>     --`modify` addBearing' b2_4     MountLeft  (ro!!3) `at` (14+77+348.5+9+11/2).*mm
 >     -- section where dL is added to length
 >     `modify` (\ s _ -> s { sectionLength = sectionLength s
 >                                   +. Symbol "dL" .* mm 
@@ -744,6 +745,73 @@ Spindle description construction.
 >         b2_2 = realScaleRR 0.5 b2
 >         b2_4 = realScaleRR 0.25 b2
 
+
+1-point roller bearing, no spacer
+
+FORCE ON FLANGE
+Rigidities   :  226.3   226.3   226.3  2170.0  
+
+Base spindle...
+Rigidity     : 267.73109401306334 N/mum
+Reactions    : -0.502  -0.428  -0.360   0.290  
+Reactions    : -0.517  -0.441  -0.340   0.298  -- spacer case
+
+Spindle with optimized length...
+dL =  24.0; Length = 372.5
+Rigidity     : 268.1568860439052 N/mum
+Reactions    : -0.497  -0.421  -0.353   0.271  
+
+
+FORCE ON RIGID CONSOLE OF 100 mm
+Rigidities   :  226.3   226.3   226.3  2170.0  
+
+Base spindle...
+Rigidity     : 107.37212721639466 N/mum
+Reactions    : -0.652  -0.521  -0.406   0.579  
+
+Spindle with optimized length...
+dL = -38.0; Length = 310.5
+Rigidity     : 108.07621731830012 N/mum
+Reactions    : -0.673  -0.546  -0.435   0.653  
+
+
+FORCE ON RIGID CONSOLE OF 200 mm
+Rigidities   :  226.3   226.3   226.3  2170.0  
+
+Base spindle...
+Rigidity     : 54.36298148827296 N/mum
+Reactions    : -0.801  -0.615  -0.452   0.869  
+
+Spindle with optimized length...
+dL = -60.0; Length = 288.5
+Rigidity     : 55.42535418498052 N/mum
+Reactions    : -0.855  -0.678  -0.524   1.057  
+
+
+FORCE ON RIGID CONSOLE OF 300 mm
+Rigidities   :  226.3   226.3   226.3  2170.0  
+
+Base spindle...
+Rigidity     : 32.279420758399425 N/mum
+Reactions    : -0.951  -0.709  -0.498   1.158  
+
+Spindle with optimized length...
+dL = -71.0; Length = 277.5
+Rigidity     : 33.245168497803306 N/mum
+Reactions    : -1.039  -0.812  -0.617   1.468  
+
+
+FORCE ON RIGID CONSOLE OF 400 mm
+Rigidities   :  226.3   226.3   226.3  2170.0  
+
+Base spindle...
+Rigidity     : 21.246189534623394 N/mum
+Reactions    : -1.100  -0.803  -0.544   1.447  
+
+Spindle with optimized length...
+dL = -78.0; Length = 270.5
+Rigidity     : 22.04598492804108 N/mum
+Reactions    : -1.225  -0.948  -0.711   1.884  
 
 
 1-point roller bearing
