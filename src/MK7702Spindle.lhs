@@ -703,6 +703,8 @@ Spindle description construction.
 >       <+> cyl 97 16)
 >      `cut`
 >      (cyl 81 109 <+> cyl 74 (711 - 109))
+>      --(cyl 76 109 <+> cyl 69 (711 - 109))
+>      --(cyl 71 109 <+> cyl 64 (711 - 109))
 >      )
 >     -- forces
 >     `modifyIf` (consoleForce /= 0, addRadialForce (consoleForce.*newton) `at` 0.*mm)
@@ -739,9 +741,13 @@ Spindle description construction.
 >         -- loaded differently in TBT set //\ - 0.84/0.84/1.16\
 >         realScaleRR s b = b { radialRigidity = s .* radialRigidity b }
 >         scaleRR s b = b -- no scale
->         b1_1st = scaleRR 0.84 b1
->         b1_2nd = scaleRR 0.84 b1
->         b1_3rd = scaleRR 1.16 b1
+>         --b1_1st = scaleRR 0.84 b1
+>         --b1_2nd = scaleRR 0.84 b1
+>         --b1_3rd = scaleRR 1.16 b1
+>         b1_scaled = {-realScaleRR 1.1-} b1
+>         b1_1st = b1_scaled
+>         b1_2nd = b1_scaled
+>         b1_3rd = b1_scaled
 >         b2_2 = realScaleRR 0.5 b2
 >         b2_4 = realScaleRR 0.25 b2
 
@@ -824,6 +830,30 @@ Rigidity     : 260.9192641748797 N/mum
 Reactions    : -0.517  -0.441  -0.340   0.298  
 Reactions    : -0.517  -0.441  -0.339   0.140   0.157  
 Reactions    : -0.517  -0.441  -0.339   0.068   0.073   0.076   0.081  
+
+               
+               
+Rigidities   :  289.5   289.5   289.5  2170.0  
+Rigidity     : 305.44510330083125 N/mum -- B71922C.T.P4S instead of B71922C.T.P4S
+                                        -- (15deg instead of 25deg)
+                                        --             k  +17%
+                                        -- but axial rigidy 371.1=>158.2 (2.35 times lower)
+
+Rigidities   :  248.9   248.9   248.9  2170.0  
+Rigidity     : 277.74742051477926 N/mum -- front bearing j +10%,
+                                        --             k  +6.4%
+Reactions    : -0.522  -0.441  -0.334   0.297  
+
+Rigidities   :  226.3   226.3   226.3  2170.0  
+Reactions    : -0.531  -0.441  -0.323   0.296  
+Rigidity     : 267.73109401306334 N/mum -- w/o spacer, k  +2.6%
+Reactions    : -0.502  -0.428  -0.360   0.290  
+Rigidity     : 253.03161601242942 N/mum -- hole  +5mm, k  -3.1%
+Reactions    : -0.522  -0.441  -0.335   0.297  
+Rigidity     : 266.71792502748013 N/mum -- hole  -5mm, k  +2.2%
+Reactions    : -0.514  -0.441  -0.343   0.298  
+Rigidity     : 271.02861649449443 N/mum -- hole -10mm, k  +3.8%
+Reactions    : -0.512  -0.441  -0.346   0.299  
 
 Spindle with optimized length...
 dL =  25.0; Length = 373.5
