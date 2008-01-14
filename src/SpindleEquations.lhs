@@ -450,12 +450,23 @@ i.e. A0...A3 become (prefix++A0...) and all reactions become prefixR1,2,...
 >                            else y
 >                     rf = radialForce f
 >                     bm = bendingMoment f
->           addB y bn c bc b fs bs =
+>           addB y bn c bc (ms,b) fs bs =
 >               (bc-.c,y) -- length = bearing coordinate - start coordinate
->               : sd (y +. partialSolutionRadialForce desc
+>               : sd (y
+>                     +.
+>                     partialSolutionRadialForce desc
 >                     (Symbol (prefix ++ "R" ++ show bn) .* newton)
 >                     -- ^ we don't know bearing reaction yet, it's our unknown
->                     bc) (bn+1) bc fs bs
+>                     bc
+>                     -- +.
+>                     --partialSolutionBendingMoment desc
+>                     --(((if mountDirection ms == MountLeft then 1 else -1) *
+>                     --  1/4 * sin (contactAngle b))
+>                     -- .* (innerDiameter b +. outerDiameter b) *.
+>                     -- Symbol (prefix ++ "R" ++ show bn) .* newton
+>                     --)
+>                     --bc
+>                     ) (bn+1) bc fs bs
 
 > getSectionDeflection :: SectionDeflections -> Value Meter -> Value Meter
 > getSectionDeflection (prefix, sd) c =

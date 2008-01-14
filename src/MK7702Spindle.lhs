@@ -855,6 +855,11 @@ Rigidity     : 266.71792502748013 N/mum -- hole  -5mm, k  +2.2%
 Reactions    : -0.514  -0.441  -0.343   0.298  
 Rigidity     : 271.02861649449443 N/mum -- hole -10mm, k  +3.8%
 Reactions    : -0.512  -0.441  -0.346   0.299  
+Rigidity     : 283.1152303747261 N/mum  -- w/moment,   k  +8.5%
+                                        -- but this is incorrect
+                                        -- we get -8.8% if we flip bearing mounting
+                                        -- but we still must get more rigid spindle
+Reactions    : -0.492  -0.425  -0.335   0.252  
 
 Rigidities   :  615.5  2170.0  
 Rigidity     : 245.92943123161749 N/mum -- 1.36*Sr single second bearing -6%, -8.8% (w/o spacer)
