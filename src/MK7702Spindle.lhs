@@ -713,6 +713,7 @@ Spindle description construction.
 >     `modify` addBearing' b1_1st MountLeft  (ro!!0) `at` (14+77-0.5*w1).*mm
 >     `modify` addBearing' b1_2nd MountLeft  (ro!!1) `at` (14+77+0.5*w1).*mm
 >     `modify` addBearing' b1_3rd MountRight (ro!!2) `at` (14+77+spacer+1.5*w1).*mm
+>     --`modify` addBearing' (realScaleRR (1.36*2) b1) MountRight (ro!!2) `at` (14+77+0.5*w1).*mm
 >     --`modify` addBearing' b1_3rd MountRight (ro!!2) `at` (14+77+{-spacer+-}1.5*w1).*mm
 >     -- rear bearing 
 >     `modify` addBearing' b2     MountLeft  (ro!!3) `at` (14+77+348.5).*mm
@@ -854,6 +855,12 @@ Rigidity     : 266.71792502748013 N/mum -- hole  -5mm, k  +2.2%
 Reactions    : -0.514  -0.441  -0.343   0.298  
 Rigidity     : 271.02861649449443 N/mum -- hole -10mm, k  +3.8%
 Reactions    : -0.512  -0.441  -0.346   0.299  
+
+Rigidities   :  615.5  2170.0  
+Rigidity     : 245.92943123161749 N/mum -- 1.36*Sr single second bearing -6%, -8.8% (w/o spacer)
+Reactions    : -1.298   0.298  
+Rigidity     : 305.1272596332921 N/mum  -- -/- single first bearing +17% (big error)
+Reactions    : -1.226   0.226  
 
 Spindle with optimized length...
 dL =  25.0; Length = 373.5
