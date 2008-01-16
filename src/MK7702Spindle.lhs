@@ -72,7 +72,7 @@ but for deflection calculation it's OK.
 >         runoutsSpacing = 2.6 .* cm
 >         b1 = findBearingByCode "B7015C.T.P4S"--"B71917C.T.P4S"
 >         b2 = findBearingByCode "B7012C.T.P4S"
->         spindleConstructor ro = console <+> testSpindleConstructor 0 0 b1 b2 ro
+>         spindleConstructor ro = console <+> testSpindleConstructor 1 0 0 b1 b2 ro
 >         generalSpindle = spindleConstructor runouts
 >     putStr "solving spindle... "
 >     generalSD <- solveSpindleDeflections i
@@ -129,7 +129,7 @@ but for deflection calculation it's OK.
 >       for innerDiameter (== 60.*mm) std15 $ \ b2 -> do
 >         --let b2 = findBearingByCode "B7012C.T.P4S"
 >         sd <- solveSpindleDeflections i
->               (substpi $ spindleDeflections $ testSpindleConstructor 1 0 b1 b2 [0,0..])
+>               (substpi $ spindleDeflections $ testSpindleConstructor 1 1 0 b1 b2 [0,0..])
 >         let sd0 = getSpindleDeflection sd (0.*mm)
 >         -- dLopt <- Maxima.eval i $ solve [diff sd0 "dL" `Equal` 0] ["dL"]
 >         -- diff sd0 has dL^6,dL^5, etc. maxima can only solve x^4...=0         
@@ -162,7 +162,7 @@ but for deflection calculation it's OK.
 >         let consoleLength = 300.*mm
 >             spindleConstructor ro =
 >                 cylinder (100.*mm) consoleLength
->                 <+> testSpindleConstructor 0 0 b1 b2 ro
+>                 <+> testSpindleConstructor 1 0 0 b1 b2 ro
 >         sdr <- solveSpindleDeflections i
 >                (substdL 0 $ substpi $ spindleDeflections $
 >                 spindleConstructor runouts)
@@ -305,23 +305,27 @@ maximum radial runout * radial rigidity.
 
 > testSeparateInnerRingRotation = do
 >     putStr "solving spindle ... "
->     sd <- solveOptimizedSpindle (console <+> testSpindleWithRunouts)
+>     let spindle = console <+> testSpindleWithRunouts
+>     sd <- solveOptimizedSpindle spindle
 >     putStrLn "ok"
 >
->     let runouts = [1.25, 1.25, 1.25, 2.5, 0.0] -- [1.25, 1.75, 0.75,  1.0, 1.5]
+>     let runouts = [1.25, 1.25, 1.25, 1.25, 0.0] -- [1.25, 1.75, 0.75,  1.0, 1.5]
 >         permutedRunouts = [front ++ rear |
 >                            front <- filterUnique $ permutations (take 3 runouts),
 >                            rear  <- {-filterUnique $ permutations-} [drop 3 runouts]]
 >     flip mapM_ permutedRunouts $ \ runouts -> do
->         mapM_ (printf "%4.2f ; " . evald) runouts
->         o <- searchOptimum2 sd runouts
->         printLine o
->	  printTotalBearingReactions
->	    $ substAnglesAndRunouts
->	        ["roa", "rob", "roc", "rod", "roe"]
->	        (optimumAngles o)
->	        runouts
->	        sd
+>       mapM_ (printf "%4.2f ; " . evald) runouts
+>       o <- searchOptimum2 sd runouts
+>       printLine o
+>
+>       let sdopt@(sdx,sdy) = substAnglesAndRunouts
+>                             ["roa", "rob", "roc", "rod", "roe"]
+>                             (optimumAngles o)
+>                             runouts
+>                             sd
+>       printTotalBearingReactions sdopt
+>       -- drawSpindle' id 0 "Runouts" spindle sdy
+>
 >     printBearingRigidities sd
 
 > optimumAngles (angles, _, _, _) = angles
@@ -359,8 +363,10 @@ run-out after.
 TODO: direct search of optimum angles is long. some optimization algorithm must exists.
 
 > searchOptimum2 sd [roa, rob, roc, rod, roe] = do
->     let range = [0,30..330] -- much better (2,3x smaller runouts) than 30 degree step
+>     --let range = [0,30..330] -- much better (2,3x smaller runouts) than 30 degree step
 >     --let range = [0,10..350] -- much better (2,3x smaller runouts) than 30 degree step
+>     --let range = [0,5..355] -- much better (2,3x smaller runouts) than 30 degree step
+>     let range = [0]
 >         halfRange = takeWhile (<= 180) range
 >         toVectors = map (\ x -> Vector { x = x, y = 0 })
 >         makeVecs r = map vectorToEvaluatedTuple $
@@ -387,12 +393,12 @@ TODO: direct search of optimum angles is long. some optimization algorithm must 
 >     do scan vecsa vecsb halfRange $ \ (bAngle, sum) -> do
 >        scan sum   vecsc range     $ \ (cAngle, sum) -> do
 >        scan sum   vecsd range     $ \ (dAngle, sum) -> do
->        scan sum   vecse range     $ \ (eAngle, sum) -> do
+>        -- scan sum   vecse range     $ \ (eAngle, sum) -> do
 >         let [(x1,y1), (x2,y2)] = sum
 >             runout1 = sqrt $ x1*x1 + y1*y1
 >             runout2 = sqrt $ x2*x2 + y2*y2
 >             maxRunout = max runout1 runout2
->             line = (map (fromRational . toRational) [0, bAngle, cAngle, dAngle, eAngle],
+>             line = (map (fromRational . toRational) [0, bAngle, cAngle, dAngle{-, eAngle-}],
 >                     (x1, y1, runout1),
 >                     (x2, y2, runout2),
 >                     maxRunout)
@@ -497,7 +503,7 @@ Additional console
 Test spindle without forces and with runouts as symbols.
 The runout symbol can be substituted after with micro meters using substRunouts
 
-> testSpindleWithRunouts = testSpindleConstructor 0 0 b1 b2 runouts
+> testSpindleWithRunouts = testSpindleConstructor 1 0 0 b1 b2 runouts
 >     where b1 = frontBearing
 >                { innerRingRadialRunout = 1 .* micro meter 
 >                }
@@ -539,15 +545,27 @@ Console deflection, nano meter per 1 newton
 
 > deflection s = (abs $ evald (getSpindleDeflection s (0.*mm) /. nano meter))
 
-> deflectionAt pos s = (abs $ evald (getSpindleDeflection s pos /. nano meter))
+> deflectionAt pos s = (abs $ deflectionAt' pos s)
+> deflectionAt' pos s = (evald (getSpindleDeflection s pos /. nano meter))
+
+> printDeflectionAt d spindleDeflections = do
+>     printf "Deflection %4d: %s\n" ((round $ evald d)::Integer) (show (deflectionAt' (d.*mm) spindleDeflections)
+>                                                                 ++ " nm")
+> printDeflectionAt' d spindleDeflections = do
+>     printf "Deflection %4d: %s\n" ((round $ evald d)::Integer) (show (deflectionAt' (d.*mm) spindleDeflections)
+>                                                                 ++ " nm")
 
 Spindle rigidity N/mum
 Remark that ridity is only valid when force applied at 0.*mm
 
-> rigidity s = (abs $ evald ((1 ./ getSpindleDeflection s (0.*mm)) *. micro meter))
+> rigidity s = rigidityAt 0 s
+> rigidityAt d s = (abs $ evald ((1 ./ getSpindleDeflection s (d.*mm)) *. micro meter))
 
 > printRigidity spindleDeflections = do
 >     putStrLn $ "Rigidity     : " ++ show (rigidity spindleDeflections) ++ " N/mum"
+
+> printRigidityAt d spindleDeflections = do
+>     printf "Rigidity %4d: %s\n" ((round $ evald d)::Integer) (show (rigidityAt d spindleDeflections) ++ " N/mum")
 
 Deflection line drawing
 
@@ -596,7 +614,7 @@ Bearing reactions and rigidities printers
 > printBearingRigidities' prefix reactions = do
 >     putStr prefix
 >     let rigidity (b,_,_) = radialRigidity b /. (newton /. micro meter)
->     mapM_ (printf "%6.1f  " . evald . rigidity) reactions
+>     mapM_ (printf "%8.1f  " . evald . rigidity) reactions
 >     putStrLn ""
 
 > printBearingRigidities :: SpindleDeflections -> IO ()
@@ -607,7 +625,7 @@ Bearing reactions and rigidities printers
 > printBearingReactions' prefix reactions = do
 >     putStr prefix
 >     let reaction (_,_,r) = r /. newton
->     mapM_ (printf "%6.3f  " . evald . reaction) reactions
+>     mapM_ (printf "%8.3f  " . evald . reaction) reactions
 >     putStrLn ""
 
 > printBearingReactions :: SpindleDeflections -> IO ()
@@ -629,7 +647,7 @@ Test spindle rigidity in two cases:
 >     testSpindleOptimalLength' spindleConstructorMK7702
 
 > testSpindleOptimalLength' spindleConstructor = do
->     let sc f c = spindleConstructor f c frontBearing rearBearing [0,0..]
+>     let sc f c = spindleConstructor id 1 f c frontBearing rearBearing [0,0..]
 >         flangeSpindle  = sc 1 0
 >         consoleSpindle consoleLength =
 >             (show (round $ evald $ consoleLength /. mm),
@@ -667,8 +685,85 @@ Test spindle rigidity in two cases:
 >     printBearingReactions s
 >                           
 >     putStrLn "\nSpindle with optimized length..."
->     printf "dL = %5.1f; Length = %5.1f\n" (evald dLopt) (evald dLopt + 348.5)
+>     printf "dL = %5.1f; Length = %5.1f; %% = %5.2f\n" (evald dLopt) (evald dLopt + 348.5)
+>            ((rigidity sopt - rigidity s) / rigidity s * 100)
 >     printRigidity sopt
+>     printBearingReactions sopt
+>                           
+>     putStrLn "\n"
+
+Checking of deflection from belt forces
+
+> checkBeltDeflections = do
+>     checkBeltDeflection "Belt1x1" "BELT 1 FORCE, 1 BEARING POINT"
+>                         [(1, 0.5)] 1
+
+-- >     checkBeltDeflection "Belt2x1" "BELT 2 FORCES, 1 BEARING POINT"
+-- >                         [(0.5, 0.25), (0.5, 0.75)] 1
+-- >     -- checkBeltDeflection "Belt3x1" "BELT 3 FORCES, 1 BEARING POINT"
+-- >     --                     [(0.3333, 0.0), (0.3333, 0.5), (0.3333, 1.0)] 1
+-- >     checkBeltDeflection "Belt4x1" "BELT 4 FORCES, 1 BEARING POINT"
+-- >                         [(1/4, 0.2), (1/4, 0.4), (1/4, 0.6), (1/4, 0.8)] 1
+
+-- >     checkBeltDeflection "Belt1x2" "BELT 1 FORCE, 2 BEARING POINTS"
+-- >                         [(1, 0.5)] 2
+-- >     checkBeltDeflection "Belt1x4" "BELT 1 FORCE, 4 BEARING POINTS"
+-- >                         [(1, 0.5)] 4
+-- >     checkBeltDeflection "Belt1x6" "BELT 1 FORCE, 6 BEARING POINTS"
+-- >                         [(1, 0.5)] 6
+
+> checkBeltDeflection spindleName experimentName beltForces rearBearingPointsCount = do
+>     putStrLn experimentName
+>     let spindle = cylinder (100.*mm) (consoleLength.*mm) <+>
+>                   spindleConstructorMK7702
+>                   addForces rearBearingPointsCount 0 0 frontBearing rearBearing [0,0..]
+>         mapDrawing = move ((0 - consoleLength).*mm) (0.*mm)
+>         consoleLength = 300
+>         addForces s = addForces' s beltForces
+>         addForces' s [] = s
+>         addForces' s ((force, pos):xs) =
+>             addForces' (s `modify` addRadialForce (force.*newton)
+>                         `at` (771 - 246 + (187 - 142) + pos * 142).*mm) xs
+>     sd <- withInterpreter (\ i -> solveSpindleDeflections i $ substpi $ spindleDeflections spindle)
+>     --sd <- withInterpreter (\ i -> solveOptimizedSpindle spindle)
+>     let sdf = getSpindleDeflection sd (consoleLength.*mm)
+>         sdc = getSpindleDeflection sd (0.*mm)
+>         sdfcdlList = map (\ dl -> (substitutepv' [("dL", dl)] sdf /. nano meter,
+>                                    substitutepv' [("dL", dl)] sdc /. nano meter,
+>                                    dl)) $ [-200..500]
+>         lengthPlot =
+>             (Line NormalLine $
+>              map (\ (sdf,sdc, dl) -> Point ((dl + 348.5 + 77 + 14).*mm) ((10*sdf).*mm)) sdfcdlList)
+>             `Over`
+>             (Line NormalLine $
+>              map (\ (sdf,sdc, dl) -> Point ((dl + 348.5 + 77 + 14).*mm) ((10*sdc).*mm)) sdfcdlList)
+>         (sd0opt, dLopt) = minimum $ map
+>                           (\(sdf,sdc,dl) -> (max (abs $ evald $ sdf) (abs $ evald $ sdc), dl)) sdfcdlList
+>         s = substdL 0 sd
+>         sopt = substdL dLopt sd
+>     drawPicture (spindleName ++ "LengthOptimizationPlot") lengthPlot
+>     drawSpindle' mapDrawing 0      spindleName                       spindle s
+>     drawSpindle' mapDrawing dLopt (spindleName ++ "OptimizedLength") spindle sopt
+>                
+>     printBearingRigidities s
+>     putStr   "Belt forces: "
+>     mapM_ (\(force, pos) -> printf "%3.1f " $ evald force) beltForces
+>     putStr "\n             "
+>     mapM_ (\(force, pos) -> printf "%3.1f " $ evald pos  ) beltForces
+>                            
+>     putStrLn "\n\nBase spindle..."
+>     printRigidityAt 0 s
+>     printRigidityAt consoleLength s
+>     printDeflectionAt' 0 s
+>     printDeflectionAt' consoleLength s
+>     printBearingReactions s
+>                           
+>     putStrLn "\nSpindle with optimized length..."
+>     printf "dL = %5.1f; Length = %5.1f\n" (evald dLopt) (evald dLopt + 348.5)
+>     printRigidityAt 0 sopt
+>     printRigidityAt consoleLength sopt
+>     printDeflectionAt' 0 sopt
+>     printDeflectionAt' consoleLength sopt
 >     printBearingReactions sopt
 >                           
 >     putStrLn "\n"
@@ -681,12 +776,16 @@ Spindle description construction.
 > frontBearing = fagB71922E
 > rearBearing  = fagNN3020
 
-> mk7702Spindle = spindleConstructorMK7702 1 0 frontBearing rearBearing [0,0,0,0]
+> --mk7702Spindle = spindleConstructorMK7702 id 2 0 0 frontBearing rearBearing [1,1,1,-1]
+> mk7702Spindle = spindleConstructorMK7702 id 1 1 0 frontBearing rearBearing [0,0,0,0]
 
-> testSpindleConstructor = spindleConstructorMK7702
+> testSpindleConstructor = spindleConstructorMK7702 id
 > testSpindle = mk7702Spindle
 
-> spindleConstructorMK7702 consoleForce forceOffset b1 b2 ro =
+> spindleConstructorMK7702 postProcess rearBearingPointsCount consoleForce forceOffset b1 b2 ro =
+>     (postProcess spindle) `modify` add_dL
+>   where
+>    spindle =
 >     -- shaft
 >     ((cyl 106 14 <+> cyl 170 29 <+> cyl 150 9
 >       <+> cyl 117 19
@@ -710,47 +809,54 @@ Spindle description construction.
 >     `modifyIf` (consoleForce /= 0, addRadialForce (consoleForce.*newton) `at` 0.*mm)
 >     `modifyIf` (forceOffset  /= 0, addBendingMoment ((consoleForce*forceOffset).*newton*.meter) `at` 1.*mm)
 >     -- front bearing set
->     `modify` addBearing' b1_1st MountLeft  (ro!!0) `at` (14+77-0.5*w1).*mm
->     `modify` addBearing' b1_2nd MountLeft  (ro!!1) `at` (14+77+0.5*w1).*mm
->     `modify` addBearing' b1_3rd MountRight (ro!!2) `at` (14+77+spacer+1.5*w1).*mm
->     --`modify` addBearing' (realScaleRR (1.36*2) b1) MountRight (ro!!2) `at` (14+77+0.5*w1).*mm
+>     `modify` addBearing' b1_1st  MountLeft  (ro!!0) `at` (14+77-0.5*w1).*mm
+>     `modify` addBearing' b1_2nd  MountLeft  (ro!!1) `at` (14+77+0.5*w1).*mm
+>     `modify` addBearing' b1_3rd  MountRight (ro!!2) `at` (14+77+spacer+1.5*w1).*mm
 >     --`modify` addBearing' b1_3rd MountRight (ro!!2) `at` (14+77+{-spacer+-}1.5*w1).*mm
+>     --`modify` addBearing' (realScaleRR (1.36*2) b1) MountRight (ro!!2) `at` (14+77+0.5*w1).*mm
 >     -- rear bearing 
->     `modify` addBearing' b2     MountLeft  (ro!!3) `at` (14+77+348.5).*mm
->     --`modify` addBearing' b2_2     MountLeft  (ro!!3) `at` (14+77+348.5-9).*mm
->     --`modify` addBearing' b2_2     MountLeft  (ro!!3) `at` (14+77+348.5+9).*mm
->     --`modify` addBearing' b2_4     MountLeft  (ro!!3) `at` (14+77+348.5-9-11/2).*mm
->     --`modify` addBearing' b2_4     MountLeft  (ro!!3) `at` (14+77+348.5-9+11/2).*mm
->     --`modify` addBearing' b2_4     MountLeft  (ro!!3) `at` (14+77+348.5+9-11/2).*mm
->     --`modify` addBearing' b2_4     MountLeft  (ro!!3) `at` (14+77+348.5+9+11/2).*mm
+>     `modifyIf` (rearBearingPointsCount == 1,
+>                 addBearing' b2s   MountLeft  (ro!!3) `at` (14+77+348.5).*mm)
+>     `modifyIf` (rearBearingPointsCount `elem` [2, 6],
+>                 addBearing' b2s MountLeft  (ro!!3) `at` (14+77+348.5-9).*mm)
+>     `modifyIf` (rearBearingPointsCount `elem` [2, 6],
+>                 addBearing' b2s MountLeft  (ro!!3) `at` (14+77+348.5+9).*mm)
+>     `modifyIf` (rearBearingPointsCount `elem` [4, 6],
+>                 addBearing' b2s MountLeft  (ro!!3) `at` (14+77+348.5-9-11/2).*mm)
+>     `modifyIf` (rearBearingPointsCount `elem` [4, 6],
+>                 addBearing' b2s MountLeft  (ro!!3) `at` (14+77+348.5-9+11/2).*mm)
+>     `modifyIf` (rearBearingPointsCount `elem` [4, 6],
+>                 addBearing' b2s MountLeft  (ro!!3) `at` (14+77+348.5+9-11/2).*mm)
+>     `modifyIf` (rearBearingPointsCount `elem` [4, 6],
+>                 addBearing' b2s MountLeft  (ro!!3) `at` (14+77+348.5+9+11/2).*mm)
+>    add_dL =
 >     -- section where dL is added to length
->     `modify` (\ s _ -> s { sectionLength = sectionLength s
->                                   +. Symbol "dL" .* mm 
->                                 })
->              `at` (250.*mm)
+>        (\ s _ -> s { sectionLength = sectionLength s
+>                      +. Symbol "dL" .* mm 
+>                    })
+>        `at` (250.*mm)
 >     -- end
->   where cyl d l = cylinder (d.*mm) (l.*mm)
->         spacer = 10
->         gaika1 = 43 -- gaika+vtulka
->         vtulka2 = 15
->         w1 = width b1 /. mm
->         w2 = width b2 /. mm
->         -- width difference compared to initial spindle
->         --wd1 = (width b1 -. width fagB7015C) /. mm
->         --wd2 = (width b2 -. width fagB7012C) /. mm
->         -- we can scale radial rigidity to account that bearings are
->         -- loaded differently in TBT set //\ - 0.84/0.84/1.16\
->         realScaleRR s b = b { radialRigidity = s .* radialRigidity b }
->         scaleRR s b = b -- no scale
->         --b1_1st = scaleRR 0.84 b1
->         --b1_2nd = scaleRR 0.84 b1
->         --b1_3rd = scaleRR 1.16 b1
->         b1_scaled = {-realScaleRR 1.1-} b1
->         b1_1st = b1_scaled
->         b1_2nd = b1_scaled
->         b1_3rd = b1_scaled
->         b2_2 = realScaleRR 0.5 b2
->         b2_4 = realScaleRR 0.25 b2
+>    cyl d l = cylinder (d.*mm) (l.*mm)
+>    spacer = 10
+>    gaika1 = 43 -- gaika+vtulka
+>    vtulka2 = 15
+>    w1 = width b1 /. mm
+>    w2 = width b2 /. mm
+>    -- width difference compared to initial spindle
+>    --wd1 = (width b1 -. width fagB7015C) /. mm
+>    --wd2 = (width b2 -. width fagB7012C) /. mm
+>    -- we can scale radial rigidity to account that bearings are
+>    -- loaded differently in TBT set //\ - 0.84/0.84/1.16\
+>    realScaleRR s b = b { radialRigidity = s .* radialRigidity b }
+>    scaleRR s b = b -- no scale
+>    --b1_1st = scaleRR 0.84 b1
+>    --b1_2nd = scaleRR 0.84 b1
+>    --b1_3rd = scaleRR 1.16 b1
+>    b1_scaled = {-realScaleRR 1.1-} b1
+>    b1_1st = b1_scaled
+>    b1_2nd = b1_scaled
+>    b1_3rd = b1_scaled
+>    b2s = realScaleRR (1 / rearBearingPointsCount) b2
 
 
 1-point roller bearing, no spacer
@@ -839,6 +945,7 @@ Rigidity     : 305.44510330083125 N/mum -- B71922C.T.P4S instead of B71922C.T.P4
                                         -- (15deg instead of 25deg)
                                         --             k  +17%
                                         -- but axial rigidy 371.1=>158.2 (2.35 times lower)
+Reactions    : -0.531  -0.441  -0.323   0.296  
 
 Rigidities   :  248.9   248.9   248.9  2170.0  
 Rigidity     : 277.74742051477926 N/mum -- front bearing j +10%,

@@ -46,12 +46,13 @@ Spindle description data type.
 > data Section = Section { momentOfInertia :: Value Meter4,
 >                          material :: Material,
 >                          sectionLength :: Value Meter,
->                          sectionDrawing :: Drawing,
+>                          sectionDrawing :: Value Meter -> Drawing,
+>                          -- TODO: maybe separate spindle and drawing?
 >                          forces :: Map.Map (Value Meter) Force,
 >                          bearings :: Map.Map (Value Meter)
 >                                              (MountScheme, Bearing)
 >                        }
->                deriving (Eq, Ord, Show)
+>               -- deriving (Eq, Ord, Show)
 >                         
 > data Force = Force { radialForce :: Value Newton,
 >                      bendingMoment :: Value NewtonMulMeter 
@@ -77,15 +78,16 @@ Cylindrical section description.
 > cylinder d l = [Section { momentOfInertia = jCircle d,
 >                           material = steel,
 >                           sectionLength = l,
->                           sectionDrawing =
->                             Line NormalLine [Point (0.*mm) ((1/2).*d),
->                                              Point l ((1/2).*d),
->                                              Point l ((-1/2).*d),
->                                              Point (0.*mm) ((-1/2).*d),
->                                              Point (0.*mm) ((1/2).*d)],
+>                           sectionDrawing = drawing,
 >                           forces = Map.empty,
 >                           bearings = Map.empty 
 >                         }]
+>     where drawing _ = -- don't work with dL, but we get continuous sections
+>               Line NormalLine [Point (0.*mm) ((1/2).*d),
+>                                Point l ((1/2).*d),
+>                                Point l ((-1/2).*d),
+>                                Point (0.*mm) ((-1/2).*d),
+>                                Point (0.*mm) ((1/2).*d)]
 
 Conical section description.
 
@@ -178,9 +180,10 @@ The cut part is drawn using HiddenLine.
 >     where cutSection base bore =
 >               base { momentOfInertia =
 >                      momentOfInertia base -. momentOfInertia bore,
->                      sectionDrawing = sectionDrawing base `over`
->                                       changeLineStyleTo HiddenLine 
->                                         (sectionDrawing bore)
+>                      sectionDrawing =
+>                        \ l -> sectionDrawing base l `over`
+>                               changeLineStyleTo HiddenLine
+>                                 (sectionDrawing bore l)
 >                    }
 
 Spindle length calculation
@@ -264,7 +267,7 @@ sectionDrawing is left in the left section
 >              s { momentOfInertia = substitutepv' [("x", Symbol "x" + l/.meter)]
 >                    (momentOfInertia s),
 >                  sectionLength = sectionLength s -. l,
->                  sectionDrawing = EmptyDrawing,
+>                  sectionDrawing = \ _ -> EmptyDrawing,
 >                  forces =   Map.mapKeys (\ k -> k -. l) $
 >                    Map.filterWithKey (\ k _ -> k > l) $ forces s,
 >                  bearings = Map.mapKeys (\ k -> k -. l) $
@@ -609,7 +612,7 @@ Solving of spindle equation system using Maxima.
 >          (subst l,
 >           (s { momentOfInertia = subst $ momentOfInertia s,
 >                sectionLength = subst $ sectionLength s,
->                sectionDrawing = substd $ sectionDrawing s,
+>                sectionDrawing = (\ l -> substd $ sectionDrawing s l),
 >                forces = Map.map
 >                  (\ f -> Force { radialForce = subst $ radialForce f,
 >                                  bendingMoment = subst $ bendingMoment f 
@@ -631,7 +634,7 @@ General utilities.
 > spindleDrawing s = d (0.*mm) s
 >     where d l [] = EmptyDrawing
 >           d l (s:xs) =
->               (move l (0.*mm) $ sectionDrawing s)
+>               (move l (0.*mm) $ (sectionDrawing s (sectionLength s)))
 >               `over`
 >               (foldl over EmptyDrawing $
 >                map (\ (p, (ms, b)) -> move (l+.p) (0.*mm) $
