@@ -646,6 +646,65 @@ Test spindle rigidity in two cases:
 > testSpindleOptimalLength =
 >     testSpindleOptimalLength' spindleConstructorMK7702
 
+> testRigidSpindleOptimalLength =
+>     testSpindleOptimalLength' $ \ a b c d e f g ->
+>         makeShaftRigid (spindleConstructorMK7702 a b c d e f g)
+
+*Main> 389.6414553301882 / 260.9192641748797
+1.493341078369105
+
+> testScaledShaftElastisity =
+>     testSpindleOptimalLength' $ \ a b c d e f g ->
+>         scaleShaftElastisity (1 + sensitivityDelta) (spindleConstructorMK7702 a b c d e f g)
+
+*Main> sensitivity 260.92770640443547 260.9192641748797 -- 0.0001
+0.3235571578996805  -- 0.0001
+*Main> sensitivity 260.9193486026578 260.9192641748797
+0.32357817030870034 -- 0.000001
+
+> sensitivityDelta = 0.000001
+> sensitivity a b = evald $ (a - b) / b / sensitivityDelta
+
+> scaleBearingRigidty s b = b { radialRigidity = s .* radialRigidity b }
+
+> testScaledFrontBearingRigidity =
+>     testSpindleOptimalLength' $ \ a b c d fb rb g ->
+>         spindleConstructorMK7702 a b c d (scaleBearingRigidty (1+sensitivityDelta) fb) rb g
+
+*Main> sensitivity 260.9366343241477 260.9192641748797 -- 0.0001
+0.6657288921510124 -- 0.0001
+*Main> sensitivity 260.91943788193447 260.9192641748797
+0.6657502094347998 -- 0.000001  difference at the level of 5th significant digit
+
+> testScaledRearBearingRigidity =
+>     testSpindleOptimalLength' $ \ a b c d fb rb g ->
+>         spindleConstructorMK7702 a b c d fb (scaleBearingRigidty (1+sensitivityDelta) rb) g
+
+*Main> sensitivity 260.9195425793388 260.9192641748797
+0.010670138135657203 -- 0.0001
+*Main> sensitivity 260.91926695919665 260.9192641748797
+0.010671181979625034 -- 0.000001 
+
+0.3086696572010104   - b1_1st
+0.22404842082039017  - b1_2nd
+0.13303227383293306  - b1_3rd (0.6657502094347998 - front)
+0.010671181979625034 - rear
+0.32357817030870034  - shaft
+--------------------
+~1.0
+
+0.010671181979625034 + 0.6657502094347998  + 0.32357817030870034 = 0.9999995617231252
+0.01067              + 0.66575             + 0.32358             = 1
+
+0.3086696572010104   + 0.22404842082039017 + 0.13303227383293306 = 0.6657503518543336
+0.30867              + 0.22405             + 0.13303             = 0.66575
+
+0.30867 + 0.22405 + 0.13303 + 0.01067 + 0.32358 = 1
+
+> testWeakRearBearingRigidity =
+>     testSpindleOptimalLength' $ \ a b c d fb rb g ->
+>         spindleConstructorMK7702 a b c d fb (scaleBearingRigidty 0.1 rb) g
+
 > testSpindleOptimalLength' spindleConstructor = do
 >     let sc f c = spindleConstructor id 1 f c frontBearing rearBearing [0,0..]
 >         flangeSpindle  = sc 1 0
@@ -653,7 +712,7 @@ Test spindle rigidity in two cases:
 >             (show (round $ evald $ consoleLength /. mm),
 >              move (0.*mm -. consoleLength) (0.*mm), -- move spindle drawing by consoleLength
 >              cylinder (100.*mm) consoleLength <+> sc 1 (consoleLength/.meter))
->         consoleSpindles = map consoleSpindle $ map (.*mm) [100,200,300,400]
+>         consoleSpindles = [] -- map consoleSpindle $ map (.*mm) [100,200,300,400]
 >     findOptimalLength id "MK7702Flange"  "FORCE ON FLANGE"        flangeSpindle
 >     flip mapM_ consoleSpindles $ \ (suffix, mapDrawing, spindle) ->
 >         findOptimalLength mapDrawing
@@ -856,8 +915,8 @@ Spindle description construction.
 >    b1_1st = b1_scaled
 >    b1_2nd = b1_scaled
 >    b1_3rd = b1_scaled
+>    --b1_3rd = realScaleRR (1+sensitivityDelta) b1_scaled
 >    b2s = realScaleRR (1 / rearBearingPointsCount) b2
-
 
 1-point roller bearing, no spacer
 

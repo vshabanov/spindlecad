@@ -191,7 +191,7 @@ Spindle length calculation
 > spindleLength :: Spindle -> Value Meter
 > spindleLength sections = foldl (+.) (0.*meter) $ map sectionLength sections
 
-Makes spindle shaft rigidity millon times greater than those steel,
+Makes spindle shaft rigidity millon times greater than those of steel,
 i.e. makes shaft practically absolutely rigid.
 TODO: This function was initially indroduced to determine what part of
 deflection is shaft deflection and what is bearings deflection.
@@ -199,9 +199,12 @@ But this is incorrect method for multibearing (and for two bearing?) shaft.
 I think that something like least squares method on bearing deflections
 can give more precice bearing deflection than absolutely rigid shaft.
 
-> makeShaftRigid = map (\ s -> s { material = rigidMaterial })
->     where rigidMaterial = steel { modulusOfElasticity =
->                                   (10^6) .* modulusOfElasticity steel }
+> scaleShaftElastisity :: CASExpr -> Spindle -> Spindle
+> scaleShaftElastisity s = map (\ s -> s { material = scale (material s) })
+>     where scale m = m { modulusOfElasticity = s .* modulusOfElasticity m }
+
+> makeShaftRigid :: Spindle -> Spindle
+> makeShaftRigid = scaleShaftElastisity (10^6)
 
 Fixities for construction functions and operators
 

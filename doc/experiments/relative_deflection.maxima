@@ -1,0 +1,120 @@
+j_sp : 1/(k_f/j_f + k_r/j_r + k_sh/j_sh);
+
+diff(j_sp, j_f) /* -> (k_f * j_sp^2) / j_f^2 */;
+s_f:diff(j_sp, j_f) / (j_sp/j_f) /* -> (k_f * j_sp) / j_f = k_f/j_f / y_sp */;
+
+s:diff(j_sp, j_f)  / (j_sp/j_f) +
+diff(j_sp, j_r)  / (j_sp/j_r) +
+diff(j_sp, j_sh) / (j_sp/j_sh);
+
+factor(s) /* -> 1 */;
+
+/* ----- */
+
+factor(diff(1/(k_f/j_f + k), j_f));
+
+expand(diff(j_sp, j_f) + diff(j_sp, j_r) + diff(j_sp, j_sh));
+
+di(f,p) := (subst(p=p*(1+d),f) / f - 1) / d;
+
+float(subst([
+  d=1/100000000000000,
+  k_f=3,
+  j_f=5,
+  k_r=7,
+  j_r=11,
+  k_sh=13,
+  j_sh=17]
+    , di(j_sp, j_f) + di(j_sp, j_r) + di(j_sp, j_sh)));
+/*
+j_sp*(1+sensitivity*d) = 1/(k_f/(j_f*(1+d)) + k);
+
+j_sp+j_sp*sensitivity*d = 1/(k_f/(j_f*(1+d)) + k);
+
+sensitivity = (1/(k_f/(j_f*(1+d)) + k) - j_sp) / j_sp / d;
+sensitivity = limit((1/(k_f/(j_f*(1+d)) + k) - j_sp) / j_sp / d, d, 0, plus);
+*/
+
+/* -------------- */
+
+/*
+Simple statically indeterminate system where static equilibrium equations
+are not enough to determine rigidity (so additional constraints are added).
+It's simple model of multi-bearing spindle where each bearing deflection
+depends on others one.
+
+sum(diff(j, j_i) / (j/j_i)) = 1
+
+         | F
+         v
+         |
+         *----%
+         |    |
+      R1 /    |
+         \    / R4
+         |    \
+    %----*    /
+    |    |    \
+    | R2 /    |
+    |    \    |
+ R5 /    |    |
+    \    *----%
+    /    |
+    \ R3 /
+    |    \
+    |    |
+    %----*
+         |
+         |
+    ------------
+    / / / / / /
+*/
+
+s:solve([
+  y1 + y2 = y4,
+  y2 + y3 = y5,
+  F = R1 + R4,
+  F = R3 + R5,
+  R1 = R2 + R5,
+  R3 = R2 + R4,
+  F = j * (y1 + y2 + y3),
+  R1 = j1*y1/* ^2 - can't solve this */,
+  R2 = j2*y2,
+  R3 = j3*y3,
+  R4 = j4*y4,
+  R5 = j5*y5],
+  [y1, y2, y3, y4, y5, R1, R2, R3, R4, R5, j]);
+
+/*
+    ((j3 + j2 + j1) j4 + j1 j3 + j1 j2) j5 + (j2 + j1) j3 j4 + j1 j2 j3
+j = -------------------------------------------------------------------]]
+	  (j4 + j3 + j2) j5 + (j2 + j1) j4 + (j2 + j1) j3 + j1 j2
+*/
+
+thej:rhs(last(first(s)));
+
+factor(thej);
+
+one:diff(thej, j1) / (thej/j1) +
+diff(thej, j2) / (thej/j2) +
+diff(thej, j3) / (thej/j3) +
+diff(thej, j4) / (thej/j4) +
+diff(thej, j5) / (thej/j5);
+
+factor(one) /* -> 1 */;
+
+solve([
+  y1 + y2 = y4,
+  y2 + y3 = y5,
+  F = j1*y1 + j4*y4,
+  F = j3*y3 + j5*y5,
+  j1*y1 = j2*y2 + j5*y5,
+  j3*y3 = j2*y2 + j4*y4,
+  F = j * (y1 + y2 + y3)
+  ],
+  [y1, y2, y3, y4, y5, j]);
+/*
+    ((j3 + j2 + j1) j4 + j1 j3 + j1 j2) j5 + (j2 + j1) j3 j4 + j1 j2 j3
+j = -------------------------------------------------------------------]]
+	  (j4 + j3 + j2) j5 + (j2 + j1) j4 + (j2 + j1) j3 + j1 j2
+*/
