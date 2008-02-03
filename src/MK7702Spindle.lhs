@@ -756,6 +756,12 @@ Checking of deflection from belt forces
 > checkBeltDeflections = do
 >     checkBeltDeflection "Belt1x1" "BELT 1 FORCE, 1 BEARING POINT"
 >                         [(1, 0.5)] 1
+>     checkBeltDeflection "Belt1x2" "BELT 1 FORCE, 2 BEARING POINTS"
+>                         [(1, 0.5)] 2
+>     checkBeltDeflection "Belt1x4" "BELT 1 FORCE, 4 BEARING POINTS"
+>                         [(1, 0.5)] 4
+>     checkBeltDeflection "Belt1x6" "BELT 1 FORCE, 6 BEARING POINTS"
+>                         [(1, 0.5)] 6
 
 -- >     checkBeltDeflection "Belt2x1" "BELT 2 FORCES, 1 BEARING POINT"
 -- >                         [(0.5, 0.25), (0.5, 0.75)] 1
@@ -764,13 +770,6 @@ Checking of deflection from belt forces
 -- >     checkBeltDeflection "Belt4x1" "BELT 4 FORCES, 1 BEARING POINT"
 -- >                         [(1/4, 0.2), (1/4, 0.4), (1/4, 0.6), (1/4, 0.8)] 1
 
--- >     checkBeltDeflection "Belt1x2" "BELT 1 FORCE, 2 BEARING POINTS"
--- >                         [(1, 0.5)] 2
--- >     checkBeltDeflection "Belt1x4" "BELT 1 FORCE, 4 BEARING POINTS"
--- >                         [(1, 0.5)] 4
--- >     checkBeltDeflection "Belt1x6" "BELT 1 FORCE, 6 BEARING POINTS"
--- >                         [(1, 0.5)] 6
-
 > checkBeltDeflection spindleName experimentName beltForces rearBearingPointsCount = do
 >     putStrLn experimentName
 >     let spindle = cylinder (100.*mm) (consoleLength.*mm) <+>
@@ -778,11 +777,12 @@ Checking of deflection from belt forces
 >                   addForces rearBearingPointsCount 0 0 frontBearing rearBearing [0,0..]
 >         mapDrawing = move ((0 - consoleLength).*mm) (0.*mm)
 >         consoleLength = 300
+>         forceOffset pos = 771 - 246 + (187 - 142) + pos * 142
 >         addForces s = addForces' s beltForces
 >         addForces' s [] = s
 >         addForces' s ((force, pos):xs) =
 >             addForces' (s `modify` addRadialForce (force.*newton)
->                         `at` (771 - 246 + (187 - 142) + pos * 142).*mm) xs
+>                         `at` (forceOffset pos).*mm) xs
 >     sd <- withInterpreter (\ i -> solveSpindleDeflections i $ substpi $ spindleDeflections spindle)
 >     --sd <- withInterpreter (\ i -> solveOptimizedSpindle spindle)
 >     let sdf = getSpindleDeflection sd (consoleLength.*mm)
@@ -813,16 +813,20 @@ Checking of deflection from belt forces
 >     putStrLn "\n\nBase spindle..."
 >     printRigidityAt 0 s
 >     printRigidityAt consoleLength s
+>     printRigidityAt (consoleLength + forceOffset 0.5) s
 >     printDeflectionAt' 0 s
 >     printDeflectionAt' consoleLength s
+>     printDeflectionAt' (consoleLength + forceOffset 0.5) s
 >     printBearingReactions s
 >                           
 >     putStrLn "\nSpindle with optimized length..."
 >     printf "dL = %5.1f; Length = %5.1f\n" (evald dLopt) (evald dLopt + 348.5)
 >     printRigidityAt 0 sopt
 >     printRigidityAt consoleLength sopt
+>     printRigidityAt (consoleLength + forceOffset 0.5 + dLopt) s
 >     printDeflectionAt' 0 sopt
 >     printDeflectionAt' consoleLength sopt
+>     printDeflectionAt' (consoleLength + forceOffset 0.5 + dLopt) s
 >     printBearingReactions sopt
 >                           
 >     putStrLn "\n"
