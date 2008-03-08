@@ -1,4 +1,4 @@
-> import Numeric.LinearAlgebra hiding (scale)
+> import Numeric.LinearAlgebra as LA
 > import Text.Printf
 
 -- > import Data.Array.IArray
@@ -18,14 +18,18 @@
 > type E = Double
 > type STMatrix s = STArray s Int (STArray s Int E)
 
+Тут не получилось STUArray т.к. он не может хранить в себе другой STUArray,
+а только примитивный тип. Т.е. если хочется STUArray то надо делать его
+одномерным и хранить кол-во байт в строке.
+
 > stMatrixOfList :: [[E]] -> ST s (STMatrix s)
 > stMatrixOfList l = do rows <- mapM (\ r -> newListArray (1, length r) r) l
 >                       newListArray (1, length rows) rows
 
-> stMatrix :: Numeric.LinearAlgebra.Matrix E -> ST s (STMatrix s)
+> stMatrix :: LA.Matrix E -> ST s (STMatrix s)
 > stMatrix = stMatrixOfList . toLists
 
-> laMatrix :: STMatrix s -> ST s (Numeric.LinearAlgebra.Matrix E)
+> laMatrix :: STMatrix s -> ST s (LA.Matrix E)
 > laMatrix m = do stRows <- getElems m
 >                 rows <- mapM getElems stRows
 >                 return $ fromLists rows
@@ -73,27 +77,35 @@ http://www.colorado.edu/engineering/CAS/courses.d/IFEM.d/IFEM.Ch04.d/IFEM.Ch04.i
 
 Слияние матрицы жесткости элемента в глобальную матрицу жесткости
 
+> mergeElemIntoMasterStiff' :: STMatrix s -> [Int] -> STMatrix s -> ST s ()
+> mergeElemIntoMasterStiff' ke eftab k =
+>     for $ \ (i, fi) ->
+>         for $ \ (j, fj) ->
+>             do e <- readSTMatrix i j ke
+>                modifySTMatrix fi fj (+ e) k
+>   where for f = mapM_ f $ zip [1..] eftab
+
+> mergeElemIntoMasterStiff :: Matrix E -> [Int] -> Matrix E -> Matrix E
 > mergeElemIntoMasterStiff keIn eftab kIn =
 >     runST $ do k <- stMatrix kIn
 >                ke <- stMatrix keIn
->                for $ \ (i, fi) ->
->                    for $ \ (j, fj) ->
->                        do e <- readSTMatrix i j ke
->                           modifySTMatrix fi fj (+ e) k
+>                mergeElemIntoMasterStiff' ke eftab k
 >                laMatrix k
->   where for f = mapM_ f $ zip [1..] eftab
 
 
 Сборка фермы из примера
 
+Нулевая квадратная матрица
+
+> zeroMatrix n = 0 .* ident n -- как, блин, сразу нулевую матрицу создать?
+>                             -- (6><6) [0, 0 ..] почему-то виснет (hmatrix что-то форсит?)
+
 > assembleMasterStiffOfExampleTruss =
 >     foldl (\ k (ke, eftab) -> mergeElemIntoMasterStiff ke eftab k)
->           kZero kes
+>           (zeroMatrix 6) kes
 >   where kes = [(elemStiff3DTwoNodeBar ( 0, 0) (10, 0) (100,        1), [1,2,3,4]),
 >                (elemStiff3DTwoNodeBar (10, 0) (10,10) (100,      1/2), [3,4,5,6]),
 >                (elemStiff3DTwoNodeBar ( 0, 0) (10,10) (100, 2*sqrt 2), [1,2,5,6])]
->         kZero = 0 .* ident 6 -- как, блин, сразу нулевую матрицу создать?
->                              -- (6><6) [0, 0 ..] почему-то виснет (hmatrix что-то форсит?)
 
 *Main> disp assembleMasterStiffOfExampleTruss
  20.00   10.00  -10.00   0.00  -10.00  -10.00
