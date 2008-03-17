@@ -1,0 +1,36 @@
+y_1(E,I,a,b,j1,j2) := 1/j1*((a+b)/a)^2 + 1/j2*(b/a)^2 + b^2*(a+b)/(3*E*I);
+
+float(y_1(210000, %pi*100^4/64, 800, 100, 120000, 120000))*1000; /* прогиб в мкм */
+
+/* shape functions */
+Nbe(e) := matrix([ 1/4*(1-e)^2*(2+e), 1/8*l*(1-e)^2*(1+e), 1/4*(1+e)^2*(2-e), -1/8*l*(1+e)^2*(1-e)]);
+
+Nbe : factor(Nbe(2*x/l-1));
+
+/* curvature-displacement matrix */
+Bbe : factor(diff(Nbe, x, 2));
+
+/* Bbe(e) := factor(4/l^2 * diff(Nbe(e), e, 2)); */
+/* Bbe(e); */
+
+/* transpose(Bbe(e)) . Bbe(e); */
+
+/* element stiffness matrix */
+Ke_be(E,I,l) := integrate(E*I*(transpose(Bbe) . Bbe), x, 0, l);
+/* Ke_be(E,I,l) := integrate(E*I*(transpose(Bbe(e)) . Bbe(e))*1/2*l, e, -1, 1); */
+
+Ke_be(E,I,l);
+
+/* consistent element node force vector */
+f_e_be(q,l) := integrate(q*transpose(Nbe), x, 0, l);
+/* f_e_be(q,l) := integrate(q*transpose(Nbe(e))*1/2*l, e, -1, 1); */
+
+f_e_be(q,l); /* constant distributed force */
+
+/* f_e_point_load_be(P,a,l) := f_e_be(q*dirac(a), l) */
+f_e_point_load_be(P,a,l) := P*transpose(subst(a,x,Nbe));
+
+f_e_point_load_be(P,a,l);
+f_e_point_load_be(P,0,l);
+f_e_point_load_be(P,l,l);
+f_e_point_load_be(P,l/2,l);
