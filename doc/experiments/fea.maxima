@@ -2,6 +2,9 @@ y_1(E,I,a,b,j1,j2) := 1/j1*((a+b)/a)^2 + 1/j2*(b/a)^2 + b^2*(a+b)/(3*E*I);
 
 float(y_1(210000, %pi*100^4/64, 800, 100, 120000, 120000))*1000; /* прогиб в мкм */
 
+
+/* Chapter 12. Variational Formulation of Plane Beam Element */
+
 /* shape functions */
 Nbe(e) := matrix([ 1/4*(1-e)^2*(2+e), 1/8*l*(1-e)^2*(1+e), 1/4*(1+e)^2*(2-e), -1/8*l*(1+e)^2*(1-e)]);
 
@@ -34,3 +37,54 @@ f_e_point_load_be(P,a,l);
 f_e_point_load_be(P,0,l);
 f_e_point_load_be(P,l,l);
 f_e_point_load_be(P,l/2,l);
+
+
+/* Chapter 13. Advanced One-Dimensional Elements */
+
+/* выводим то же самое, но через другие shape function
+   плюс выводим всякие дополнительные вкусности.
+*/
+
+/* Legendre polinomials */
+L(n,x) := factor(1/(2^n * n!)*diff((x^2-1)^n, x, n));
+
+/* shape functions */
+Legendre(e) := matrix([ L(0,e), L(1,e), L(2,e), L(3,e) ]);
+
+Legendre(e);
+L : subst(2*x/l - 1, e, Legendre(e));
+
+/* covariance matrices */
+Q(n) := integrate(transpose(diff(L,x,n)) . diff(L,x,n), x, 0, l);
+
+Q0 : Q(0);
+Q(1); /* не диагональная */
+Q2 : Q(2);
+Q3 : Q(3);
+
+/* Generalized stiffness (in generalized coordinates) */
+
+/* Rb = E*I -- bending rigidity */
+/* Kcb -- матрица жесткости на изгиб в обобщенных координатах */
+/* diff(L,x,2) -- curvature, E*I*v'' = M */
+Kcb(Rb) := integrate(transpose(diff(L,x,2)) . (Rb * diff(L,x,2)), x, 0, l);
+
+Kcb(Rb) = Rb*Q2; /* для случая с Rb = const */
+
+/* деформация сдвига, Y зависит от модели среднего сдвига (mean-shear model) */
+shear_distortion : Y * l^2 * diff(L,x,3);
+/* Rs = G*As -- shear rigidity */
+Kcs(Rs) := integrate(transpose(shear_distortion) . (Rs * shear_distortion), x, 0, l);
+
+Kcs(Rs);
+
+/* Преобразования из обобщенных координат в балочные */
+
+/* u_e = Gb c */
+Gb : matrix([1, -1, 1, -1], [0, 2/l, -6/l, 12/l], [1,1,1,1], [0, 2/l, 6/l, 12/l]);
+
+/* c = Hb u_e */
+Hb : invert(Gb);
+
+Kbe(Rb) := transpose(Hb) . Kcb(Rb) . Hb;
+Kbe(E*I) - Ke_be(E,I,l); /* одно и то же */
