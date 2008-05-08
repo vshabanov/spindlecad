@@ -23,6 +23,7 @@
 а только примитивный тип. Т.е. если хочется STUArray то надо делать его
 одномерным и хранить кол-во байт в строке.
 
+> -- | Ф-я
 > stMatrixOfList :: [[E]] -> ST s (STMatrix s)
 > stMatrixOfList l = do rows <- mapM (\ r -> newListArray (1, length r) r) l
 >                       newListArray (1, length rows) rows
