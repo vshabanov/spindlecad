@@ -24,7 +24,9 @@ module ElementMatrix (
     -- ** Assembly
     assemble,
     -- ** Solution
-    solve    
+    solve,
+    -- ** Queries
+    get, getv
     ) where
 
 import Numeric.LinearAlgebra as LA
@@ -71,6 +73,14 @@ dispv v = disp $ fromColumns [v]
 -- | Linear solution.
 solve :: M -> V -> V
 solve = (<\>)
+
+-- | Matrix element
+get :: M -> I -> I -> D
+get m a b = m @@> (a, b)
+
+-- | Vector element
+getv :: V -> I -> D
+getv v i = v @> i
 
 -- | Element matrices assembling.
 -- Uses list of matrices and degrees of freedom indices to assemble

@@ -36,7 +36,7 @@ data Material = IsotropicMaterial
 steel :: Material
 steel = IsotropicMaterial
     { name = "steel",
-      modulusOfElasticity = 2*10^5,
+      modulusOfElasticity = 2.1*10^5,
       modulusOfRigidity   = 0.8*10^5,
       poissonRatio        = 0.3 
     }
