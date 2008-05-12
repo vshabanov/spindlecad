@@ -1,0 +1,13 @@
+Name:                TestFEA
+Version:             0.0
+Description:         Playing with finite elements
+License:             GPL
+License-file:        LICENSE
+Author:              Vladimir Shabanov
+Maintainer:          vshabanoff@gmail.com
+Build-Depends:       base, hmatrix
+
+Executable:          TestFEA
+Main-is:             Main.hs
+ghc-options:         -O
+
