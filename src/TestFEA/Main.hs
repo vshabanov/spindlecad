@@ -14,6 +14,9 @@ module Main (
 
 import System.Environment
 import ElementMatrix
+import Node
+import Element
+import Elements.TwoNodeBar2D
  
 -- | Main program
 main :: IO ()

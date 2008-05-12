@@ -12,11 +12,13 @@
 module ElementMatrix (
     -- * Types
     D,
-    EM,
-    EV,
+    M,
+    V,
+    I,
+    FI,
     -- * Functions
     -- ** Creation
-    matrix, vector,
+    matrix, vector, fi,
     -- ** Printing
     disp, dispv,
     -- ** Assembly
@@ -35,35 +37,45 @@ import Data.Array.ST
 type D = Double
 
 -- | Finite element matrix.
-type EM = LA.Matrix D
+type M = LA.Matrix D
 
 -- | Finite element vector (forces, boundary conditions).
-type EV = LA.Vector D
+type V = LA.Vector D
+
+-- | Index type
+type I = Int
+
+-- | Freedom indices list
+type FI = [I]
 
 -- | Makes fresh square finite element matrix.
-matrix :: Int -> [D] -> EM
+matrix :: Int -> [D] -> M
 matrix n e = (n><n) e
 
 -- | Makes fresh vector.
-vector :: Int -> [D] -> EV
+vector :: Int -> [D] -> V
 vector n e = n |> e
 
+-- | Makes freedom indices list.
+fi :: (Integral a, Num a) => [a] -> FI
+fi x = map fromIntegral x
+
 -- | Display matrix.
-disp :: EM -> IO ()
+disp :: M -> IO ()
 disp m = putStrLn $ format "  " (printf "%.2f") m
 
 -- | Display vector.
-dispv :: EV -> IO ()
+dispv :: V -> IO ()
 dispv v = disp $ fromColumns [v]
 
 -- | Linear solution.
-solve :: EM -> EV -> EV
+solve :: M -> V -> V
 solve = (<\>)
 
 -- | Element matrices assembling.
 -- Uses list of matrices and degrees of freedom indices to assemble
 -- master matrix.
-assemble :: [(EM, [Int])] -> EM
+assemble :: [(M, FI)] -> M
 assemble kes = runST $ do
     k <- zeroSquareMatrix size
     m <- mapM (\ (ke, eftab) -> stMatrix ke >>= \ s -> return (s, eftab)) kes
@@ -100,10 +112,10 @@ stMatrixOfList :: [[D]] -> ST s (STMatrix s)
 stMatrixOfList l = do rows <- mapM (\ r -> newListArray (1, length r) r) l
                       newListArray (1, length rows) rows
 
-stMatrix :: EM -> ST s (STMatrix s)
+stMatrix :: M -> ST s (STMatrix s)
 stMatrix = stMatrixOfList . toLists
 
-laMatrix :: STMatrix s -> ST s EM
+laMatrix :: STMatrix s -> ST s M
 laMatrix m = do stRows <- getElems m
                 rows <- mapM getElems stRows
                 return $ fromLists rows
