@@ -16,15 +16,18 @@ module Elements.TwoNodeBar2D (
 import Node
 import Element
 import ElementMatrix
+import Material
+import CrossSection
 
--- | @twoNodeBar2D node1 node2 (modulusOfElasticity, crossSectionArea)@
-twoNodeBar2D :: Node.XY -> Node.XY -> (D,D) -> E
-twoNodeBar2D n1 n2 (e, a) =
+-- | 
+twoNodeBar2D :: Node.XY -> Node.XY -> Material -> CrossSection -> E
+twoNodeBar2D n1 n2 mat cs =
     linearElement
-    (matrix 4 $ map (e*a/l*) [  c^2,  c*s, -c^2, -c*s
-                             ,  c*s,  s^2, -s*c, -s^2
-                             , -c^2, -s*c,  c^2,  s*c
-                             , -s*c, -s^2,  s*c,  s^2 ])
+    (matrix 4 $ map (materialE mat * area cs / l *)
+     [  c^2,  c*s, -c^2, -c*s
+     ,  c*s,  s^2, -s*c, -s^2
+     , -c^2, -s*c,  c^2,  s*c
+     , -s*c, -s^2,  s*c,  s^2 ])
     (fi [i1,i2,i3,i4])
     where l  = sqrt $ dx^2 + dy^2
           dx = x2 - x1

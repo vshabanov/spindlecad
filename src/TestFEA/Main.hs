@@ -14,10 +14,15 @@ module Main (
 
 import System.Environment
 import ElementMatrix
+import Material
+import CrossSection
 import Node
 import Element
 import Elements.TwoNodeBar2D
+import Elements.TimoshenkoBeam2D
  
 -- | Main program
 main :: IO ()
-main = return ()
+main = print $ timoshenkoBeam2D n1 n2 steel (circle 100)
+  where n1 = xyc (0,1,2) (0  ,0,0)
+        n2 = xyc (3,4,5) (100,0,0)
