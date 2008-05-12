@@ -1,4 +1,4 @@
 runhaskell Setup.lhs configure --prefix=$HOME --user
-runhaskell Setup.lhs haddock
+runhaskell Setup.lhs haddock --executables
 runhaskell Setup.lhs build
 runhaskell Setup.lhs install

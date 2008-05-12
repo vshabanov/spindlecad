@@ -1,6 +1,13 @@
--- | Главный модуль -- russian letters doesn't work in Haddock
--- Copyright (c) 2008 Vladimir Shabanov
--- GPL version 2 or later
+-- | 
+-- Module      :  TestFEA.Main
+-- Copyright   :  Vladimir Shabanov 2008
+-- License     :  GPL (see the LICENSE file in the distribution)
+--
+-- Maintainer  :  vshabanoff@gmail.com
+-- Stability   :  experimental
+-- Portability :  portable
+--
+-- Stub 'do-nothing' main module
 module Main (
     main
     ) where
@@ -10,4 +17,4 @@ import ElementMatrix
  
 -- | Main program
 main :: IO ()
-main = getArgs >>= print
+main = return ()
