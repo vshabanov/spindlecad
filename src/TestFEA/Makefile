@@ -12,7 +12,6 @@ fast-docs:
 	runhaskell Setup.lhs haddock --executables
 
 docs: configure fast-docs
-	runhaskell Setup.lhs haddock --executables
 
 install: build docs
 	runhaskell Setup.lhs install
