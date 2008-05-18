@@ -13,6 +13,7 @@ module Elements.BernoulliEulerBeam2D (
     bernoulliEulerBeam2D,
     ) where
 
+import Graphics.Rendering.Cairo
 import Node
 import Element
 import ElementMatrix
@@ -34,6 +35,7 @@ bernoulliEulerBeam2D n1 n2 mat cs =
      ,   0,  -12,      -6*l,  0,   12,      -6*l
      ,   0,  6*l, l^2*(2-f),  0, -6*l, l^2*(4+f) ])
     (fi [i1,i2,i3,i4,i5,i6])
+    drawBeam
     where l  = abs $ x2 - x1
           ei = materialE mat * areaMomentOfInertia cs
           f = 0 -- 12 * ei / (materialG mat * timoshenko_A_s mat cs * l^2)                
@@ -41,3 +43,6 @@ bernoulliEulerBeam2D n1 n2 mat cs =
           (x2, _, _) = xycCoords n2
           (i1, i2, i3) = xycFI n1
           (i4, i5, i6) = xycFI n2
+
+drawBeam :: [Node.C] -> Render ()
+drawBeam c = return ()

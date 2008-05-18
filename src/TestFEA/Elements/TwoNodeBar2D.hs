@@ -29,6 +29,7 @@ twoNodeBar2D n1 n2 mat cs =
      , -c^2, -s*c,  c^2,  s*c
      , -s*c, -s^2,  s*c,  s^2 ])
     (fi [i1,i2,i3,i4])
+    (\ x -> return ())
     where l  = sqrt $ dx^2 + dy^2
           dx = x2 - x1
           dy = y2 - y1

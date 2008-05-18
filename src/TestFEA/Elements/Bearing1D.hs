@@ -27,4 +27,5 @@ linearYBearing node rigidity =
                                   0, 1, 0,
                                   0, 0, 0 ])
     (fi [i1,i2,i3])
+    (\ x -> return ())
     where (i1, i2, i3) = xycFI node

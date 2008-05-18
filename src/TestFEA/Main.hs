@@ -12,6 +12,8 @@ module Main (
     main
     ) where
 
+import Graphics.UI.Gtk
+import Graphics.Rendering.Cairo
 import System.Environment
 import Control.Monad
 import ElementMatrix
@@ -24,6 +26,29 @@ import Elements
 -- | Main program
 main :: IO ()
 main = do
+    initGUI
+    canvas <- drawingAreaNew
+    widgetModifyBg canvas StateNormal (Color 65535 65535 65535)
+
+    mainWindow <- windowNew
+    set mainWindow
+            [windowDefaultWidth := 200, windowDefaultHeight := 200,
+             containerChild := canvas, containerBorderWidth := 10,
+             windowTitle := "SpindleCAD"]
+    onDestroy mainWindow mainQuit
+
+    widgetShowAll mainWindow -- чтобы появился drawWindow
+
+    drawWindow <- widgetGetDrawWindow canvas
+    onExpose canvas $ \x -> do (w,h) <- widgetGetSize canvas
+                               renderWithDrawable drawWindow $
+                                   draw elements (fromIntegral w) (fromIntegral h)
+                               return $ eventSent x
+    tlt <- tooltipsNew
+    tooltipsSetTip tlt canvas "Подсказка" ""
+    tooltipsEnable tlt
+    mainGUI
+    
     --print $ elements
     --disp masterStiffness
     --print displacements
@@ -56,3 +81,55 @@ main = do
                           (map freedomIndices elements)
         masterForces = vector 15 ([0, 1] ++ replicate (15-2) 0)
         displacements = solve masterStiffness masterForces
+
+space = 10
+
+hbox :: [Widget] -> IO Widget
+hbox children = do
+    b <- hBoxNew True space
+    flip mapM_ children $ \ widget -> boxPackStart b widget PackGrow 0
+    return $ toWidget b
+
+vbox :: [Widget] -> IO Widget
+vbox children = do
+    b <- vBoxNew True space
+    flip mapM_ children $ \ widget -> boxPackStart b widget PackGrow 0
+    return $ toWidget b
+
+draw :: [Element.E] -> Double -> Double -> Render ()
+draw elements w h = withSavedMatrix $ do
+    translate 0 (fromIntegral $ truncate $ h / 2)
+    mapM_ (\ elt -> render elt [0..]) elements
+    -- TODO: сделать передачу координат из displacements 
+    -- по freedomIndices и сделать отрисовку BernoulliEulerBeam2d по
+    -- её shape functions и посмотреть как отрисовать балку
+    -- Тимошенко (должна показывать еще и поперечные смещения,
+    -- какое-то дополнительное преобразование для shape functions или
+    -- вообще другие shape functions?)
+
+--     setSourceRGB 1 1 0
+--     setLineWidth 5
+
+--     moveTo 120 60
+--     lineTo 60 110
+--     lineTo 180 110
+--     closePath
+    
+--     stroke
+
+withSavedMatrix :: Render () -> Render ()
+withSavedMatrix r = do
+    m <- getMatrix
+    r
+    setMatrix m
+
+-- a4 :: Num a => (a, a)
+-- a4 = (210, 297)
+
+-- writePDF :: IO ()
+-- writePDF =
+--     withPDFSurface "myDraw.pdf" pdw pdh $
+--         \s -> renderWith s $ do myDraw pdw pdh
+--                                 showPage
+--     where pdw = fst a4 / 25.4 * 72
+--           pdh = snd a4 / 25.4 * 72

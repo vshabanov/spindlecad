@@ -32,6 +32,7 @@ timoshenkoBeam2D n1 n2 mat cs =
      ,   0,  -12,      -6*l,  0,   12,      -6*l
      ,   0,  6*l, l^2*(2-f),  0, -6*l, l^2*(4+f) ])
     (fi [i1,i2,i3,i4,i5,i6])
+    (\ x -> return ())
     where l  = abs $ x2 - x1
           ei = materialE mat * areaMomentOfInertia cs
           f = 12 * ei / (materialG mat * timoshenko_A_s mat cs * l^2)

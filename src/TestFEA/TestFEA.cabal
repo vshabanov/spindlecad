@@ -5,7 +5,7 @@ License:             GPL
 License-file:        LICENSE
 Author:              Vladimir Shabanov
 Maintainer:          vshabanoff@gmail.com
-Build-Depends:       base, array, hmatrix
+Build-Depends:       base, array, hmatrix, cairo, gtk
 
 Executable:          TestFEA
 Main-is:             Main.hs
