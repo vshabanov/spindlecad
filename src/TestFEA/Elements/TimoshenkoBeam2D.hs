@@ -24,15 +24,14 @@ import CrossSection
 timoshenkoBeam2D :: Node.XYC -> Node.XYC -> Material -> CrossSection -> E
 timoshenkoBeam2D n1 n2 mat cs =
     linearElement
-    (matrix 6 $ map (ei/(l^3*(1+f))*)
-     [   1,    0,         0,  0,    0,         0
-     ,   0,   12,       6*l,  0,  -12,       6*l
-     ,   0,  6*l, l^2*(4+f),  0, -6*l, l^2*(2-f)
-     ,   0,    0,         0,  1,    0,         0
-     ,   0,  -12,      -6*l,  0,   12,      -6*l
-     ,   0,  6*l, l^2*(2-f),  0, -6*l, l^2*(4+f) ])
-    (fi [i1,i2,i3,i4,i5,i6])
-    (\ x -> return ())
+    (matrix 4 $ map (ei/(l^3*(1+f))*)
+     [   12,        6*l,   -12,        6*l
+     ,  6*l,  l^2*(4+f),  -6*l,  l^2*(2-f)
+     ,    0,          0,     0,          0
+     ,  -12,       -6*l,    12,       -6*l
+     ,  6*l,  l^2*(2-f),  -6*l,  l^2*(4+f) ])
+    (fi [i2,i3,i5,i6])
+    noRender
     where l  = abs $ x2 - x1
           ei = materialE mat * areaMomentOfInertia cs
           f = 12 * ei / (materialG mat * timoshenko_A_s mat cs * l^2)

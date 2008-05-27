@@ -12,18 +12,36 @@
 module Element (
     -- * Types
     E,
+    RenderParameters (..),
     ElementRender,
     -- * Creation
     linearElement,
     -- * Queries
-    freedomIndices, stiffnessMatrix, render
+    freedomIndices, stiffnessMatrix, render,
+--    displacementsScale,
+    -- * Utils
+    noRender
     ) where
 
 import ElementMatrix
 import Node
 import Graphics.Rendering.Cairo
 
-type ElementRender = [Node.C] -> Render ()
+-- | Parameters necessary to render element
+data RenderParameters =
+    RenderParameters
+    { displacementsScale :: D
+    }
+
+-- | Render element using render parameters and node displacements
+type ElementRender = RenderParameters -> [Node.C] -> Render ()
+    -- TODO: тут пока передаем смещения, надо посмотреть,
+-- м.б. правильнее передавать координаты? будет понятно после
+-- реализации нелинейных элементов.
+
+-- | Empty element render
+noRender :: ElementRender
+noRender rp d = return ()
 
 -- | Finite element description
 data E =

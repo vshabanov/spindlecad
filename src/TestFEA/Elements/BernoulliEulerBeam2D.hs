@@ -27,15 +27,13 @@ import CrossSection
 bernoulliEulerBeam2D :: Node.XYC -> Node.XYC -> Material -> CrossSection -> E
 bernoulliEulerBeam2D n1 n2 mat cs =
     linearElement
-    (matrix 6 $ map (ei/(l^3*(1+f))*)
-     [   1,    0,         0,  0,    0,         0
-     ,   0,   12,       6*l,  0,  -12,       6*l
-     ,   0,  6*l, l^2*(4+f),  0, -6*l, l^2*(2-f)
-     ,   0,    0,         0,  1,    0,         0
-     ,   0,  -12,      -6*l,  0,   12,      -6*l
-     ,   0,  6*l, l^2*(2-f),  0, -6*l, l^2*(4+f) ])
-    (fi [i1,i2,i3,i4,i5,i6])
-    drawBeam
+    (matrix 4 $ map (ei/(l^3*(1+f))*)
+     [  12,         6*l,   -12,        6*l
+     ,  6*l,  l^2*(4+f),  -6*l,  l^2*(2-f)
+     ,  -12,       -6*l,    12,       -6*l
+     ,  6*l,  l^2*(2-f),  -6*l,  l^2*(4+f) ])
+    (fi [i2,i3,i5,i6])
+    (drawBeam (x1, x2))
     where l  = abs $ x2 - x1
           ei = materialE mat * areaMomentOfInertia cs
           f = 0 -- 12 * ei / (materialG mat * timoshenko_A_s mat cs * l^2)                
@@ -44,5 +42,33 @@ bernoulliEulerBeam2D n1 n2 mat cs =
           (i1, i2, i3) = xycFI n1
           (i4, i5, i6) = xycFI n2
 
-drawBeam :: [Node.C] -> Render ()
-drawBeam c = return ()
+drawBeam :: C2 -> RenderParameters -> [Node.C] -> Render ()
+drawBeam (x1, x2) rp [dy1, dc1, dy2, dc2] = do
+    let sc = (* displacementsScale rp)
+
+    centerLine
+    moveTo x1 0
+    lineTo x2 0
+    closePath
+    stroke
+
+    thickLine
+    moveTo x1 $ sc dy1
+    lineTo x2 $ sc dy2
+    closePath
+    stroke
+    
+
+centerLine :: Render ()
+centerLine = do
+    setSourceRGB 0.5 0.5 0.5
+    setLineWidth 1
+    setDash [20, 4] 0
+    setLineCap LineCapRound
+
+thickLine :: Render ()
+thickLine = do
+    setSourceRGB 0.3 0.3 0.3
+    setLineWidth 2
+    setDash [] 0
+    setLineCap LineCapRound

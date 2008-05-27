@@ -23,9 +23,7 @@ import CrossSection
 linearYBearing :: Node.XYC -> D -> E
 linearYBearing node rigidity =
     linearElement
-    (matrix 3 $ map (rigidity*) [ 0, 0, 0,
-                                  0, 1, 0,
-                                  0, 0, 0 ])
-    (fi [i1,i2,i3])
-    (\ x -> return ())
+    (matrix 1 [rigidity])
+    (fi [i2])
+    noRender
     where (i1, i2, i3) = xycFI node

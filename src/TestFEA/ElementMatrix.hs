@@ -26,7 +26,7 @@ module ElementMatrix (
     -- ** Solution
     solve,
     -- ** Queries
-    get, getv
+    get, getv, vectorToList
     ) where
 
 import Numeric.LinearAlgebra as LA
@@ -54,9 +54,13 @@ type FI = [I]
 matrix :: Int -> [D] -> M
 matrix n e = (n><n) e
 
--- | Makes fresh vector.
+-- | Makes fresh vector of specified size.
 vector :: Int -> [D] -> V
 vector n e = n |> e
+
+-- | 
+vectorToList :: V -> [D]
+vectorToList v = toList v
 
 -- | Makes freedom indices list.
 fi :: (Integral a, Num a) => [a] -> FI
@@ -91,7 +95,7 @@ assemble kes = runST $ do
     m <- mapM (\ (ke, eftab) -> stMatrix ke >>= \ s -> return (s, eftab)) kes
     assemble' m k
     laMatrix k
-  where size = maximum $ map (\ (_, eftab) -> maximum eftab) kes
+  where size = (maximum $ map (\ (_, eftab) -> maximum eftab) kes) + 1
 
 zeroSquareMatrix :: Int -> ST s (STMatrix s)
 zeroSquareMatrix n = stMatrixOfList $ take n $ repeat (take n $ repeat 0)
@@ -106,7 +110,7 @@ mergeElemIntoAssembly' ke eftab k =
         for $ \ (j, fj) ->
             do e <- readSTMatrix i j ke
                modifySTMatrix fi fj (+ e) k
-    where for f = mapM_ f $ zip [1..] eftab
+    where for f = mapM_ f $ zip [0..] eftab
 
 -- Некоторые утилиты для работы с ST матрицами (в них удобнее
 -- оперировать на уровне элементов, чем с матрицами
@@ -119,8 +123,8 @@ type STMatrix s = STArray s Int (STArray s Int D)
 -- одномерным и хранить кол-во байт в строке.
 
 stMatrixOfList :: [[D]] -> ST s (STMatrix s)
-stMatrixOfList l = do rows <- mapM (\ r -> newListArray (1, length r) r) l
-                      newListArray (1, length rows) rows
+stMatrixOfList l = do rows <- mapM (\ r -> newListArray (0, length r - 1) r) l
+                      newListArray (0, length rows - 1) rows
 
 stMatrix :: M -> ST s (STMatrix s)
 stMatrix = stMatrixOfList . toLists
