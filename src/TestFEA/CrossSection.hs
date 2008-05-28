@@ -11,7 +11,7 @@
 --
 module CrossSection (
     -- * Types
-    CrossSection,
+    CrossSection(..),
     -- * Creation
     circle, ring,
     -- * Queries

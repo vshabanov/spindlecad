@@ -25,6 +25,8 @@ module ElementMatrix (
     assemble,
     -- ** Solution
     solve,
+    -- ** Multiplication
+    mulmv,
     -- ** Queries
     get, getv, vectorToList
     ) where
@@ -73,6 +75,10 @@ disp m = putStrLn $ format "  " (printf "%.2f") m
 -- | Display vector.
 dispv :: V -> IO ()
 dispv v = disp $ fromColumns [v]
+
+-- | Multiply matrix by vector.
+mulmv :: M -> V -> V
+mulmv m v = m <> v
 
 -- | Linear solution.
 solve :: M -> V -> V

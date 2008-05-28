@@ -107,7 +107,7 @@ draw elements displacements w h = withSavedMatrix $ do
         eltDisp elt = map (fromJust . flip lookup indexedDisplacements)
                       $ freedomIndices elt
         renderParameters = RenderParameters
-                           { displacementsScale = 2*10000000
+                           { displacementsScale = 3*10000000
                            }
     translate 0 (fromIntegral $ truncate $ h / 2)
     -- setAntialias AntialiasSubpixel
