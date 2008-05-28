@@ -69,7 +69,7 @@ drawBeam cs (x1, x2) rp bold_u = do
         -- | Displacements field
         u x y = -y * theta x
         v x y = interpolate legendre x
-        theta x = interpolate legendre'
+        theta = interpolate legendre'
         -- TODO: искажается диаметр балки при больших масштабах смещений
         -- причем и в верхнем случае (из книжки) и в нижнем (навскидку)
         -- надо разобраться
