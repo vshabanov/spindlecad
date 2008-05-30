@@ -57,7 +57,7 @@ main = do
     --disp masterStiffness
     --print displacements
     print $ getv displacements 0
-    print $ 1 / (getv displacements 0 * 1000)
+    print $ abs $ 1 / (getv displacements 0 * 1000)
   where u = undefined
         n1 = xyc (u, 0, 1) (0  , u, u)
         n2 = xyc (u, 2, 3) (100, u, u)
@@ -84,7 +84,7 @@ main = do
         masterStiffness = assemble $ zip
                           (map stiffnessMatrix elements)
                           (map freedomIndices elements)
-        masterForces = vector 10 ([1] ++ replicate (10-1) 0)
+        masterForces = vector 10 ([-1] ++ replicate (10-1) 0)
         displacements = solve masterStiffness masterForces
 
 space = 10
@@ -109,7 +109,8 @@ draw elements displacements w h = withSavedMatrix $ do
         renderParameters = RenderParameters
                            { displacementsScale = 3*10000000
                            }
-    translate 0 (fromIntegral $ truncate $ h / 2)
+    translate 100 (fromIntegral $ truncate $ h / 2)
+    scale 1 (-1) -- flip Y
     -- setAntialias AntialiasSubpixel
     mapM_ (\ elt -> render elt renderParameters (eltDisp elt)) elements
     -- TODO: сделать передачу координат из displacements 

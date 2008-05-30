@@ -67,17 +67,13 @@ drawBeam cs (x1, x2) rp bold_u = do
         -- | Interpolation in generalized coordinates
         interpolate l x = sum $ zipWith (*) c (l $ e x)
         -- | Displacements field
-        u x y = -y * theta x
-        v x y = interpolate legendre x
-        theta = interpolate legendre'
-        -- TODO: искажается диаметр балки при больших масштабах смещений
-        -- причем и в верхнем случае (из книжки) и в нижнем (навскидку)
-        -- надо разобраться
---         u x y = -y * sin (theta x)
---         v x y = interpolate legendre x - y * (1 - cos (theta x))
---         theta x = atan $ interpolate legendre' x
+--         u x y = -y * dy x  -- scales cross section diameter
+--         v x y = interpolate legendre x
+        u x y = -y * sin (theta x) 
+        v x y = interpolate legendre x + y * (cos (theta x) - 1)
+        dy = interpolate legendre'
+        theta x = atan $ dy x
         -- | Displaced coodrinates
---         xy x y = (sc (u x y) + x, sc (v x y) + y)
         xy x y = (u x y + x, v x y + y)
 
 --     trace (concat [show bold_u, "\n",
@@ -100,8 +96,17 @@ drawBeam cs (x1, x2) rp bold_u = do
             do uncurry moveTo $ xy x y1
                uncurry lineTo $ xy x y2
                stroke
+--                uncurry moveTo $ kasat x (-50)
+--                uncurry lineTo $ kasat x ( 50)
+--                stroke
+--         kasat x dx = (x + dx, (snd $ xy x 0) + dy x * dx)
         rIn = dIn cs / 2
         rOut = dOut cs / 2
+
+    thinLine
+    flip mapM_ [x1, x1+10 .. x2] $ \ x ->
+        do xLine x rIn rOut
+           xLine x (-rIn) (-rOut)
 
     thickLine
     yLine 0
@@ -113,21 +118,14 @@ drawBeam cs (x1, x2) rp bold_u = do
                yLine rIn
        else return ()
 
-    xLine x1 rIn rOut
-    xLine x1 (-rIn) (-rOut)
-    xLine x2 rIn rOut
-    xLine x2 (-rIn) (-rOut)
-
-    thinLine
-    flip mapM_ [x1, x1+10 .. x2] $ \ x ->
-        do xLine x rIn rOut
-           xLine x (-rIn) (-rOut)
+    xLine x1 (-rOut) rOut
+    xLine x2 (-rOut) rOut
 
 centerLine :: Render ()
 centerLine = do
     setSourceRGB 0.5 0.5 0.5
     setLineWidth 1
-    setDash [15, 2, 4, 2] 0
+    setDash [25, 4, 8, 4] 0
     setLineCap LineCapRound
 
 thickLine :: Render ()
