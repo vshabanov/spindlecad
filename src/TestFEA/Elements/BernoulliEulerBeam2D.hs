@@ -56,7 +56,7 @@ drawBeam cs (x1, x2) rp bold_u = do
                                    ]
         -- | Generalized coordinates [c_1, c_2, c_3, c_4]
         c :: [D]
-        c   = vectorToList $ h_b `mulmv` vector 4 bold_u
+        c   = vectorToList $ h_b `mulmv` vector 4 (map sc bold_u)
         -- | Natural coordinate e <- [-1..1] = 2*x/l - 1
         e x = 2*(x-x1)/(x2-x1) - 1
         -- | Legendre polynomials (u interpolation)
@@ -77,7 +77,8 @@ drawBeam cs (x1, x2) rp bold_u = do
 --         v x y = interpolate legendre x - y * (1 - cos (theta x))
 --         theta x = atan $ interpolate legendre' x
         -- | Displaced coodrinates
-        xy x y = (sc (u x y) + x, sc (v x y) + y)
+--         xy x y = (sc (u x y) + x, sc (v x y) + y)
+        xy x y = (u x y + x, v x y + y)
 
 --     trace (concat [show bold_u, "\n",
 --                    show c, "\n",
@@ -104,17 +105,23 @@ drawBeam cs (x1, x2) rp bold_u = do
 
     thickLine
     yLine 0
-    -- TODO: проверить численно осевую линию на совпадение
-    yLine rOut
     yLine (-rOut)
+    yLine rOut
+    -- TODO: проверить численно осевую линию на совпадение
     if rIn > 0
-       then do yLine rIn
-               yLine (-rIn)
+       then do yLine (-rIn)
+               yLine rIn
        else return ()
 
     xLine x1 rIn rOut
+    xLine x1 (-rIn) (-rOut)
+    xLine x2 rIn rOut
     xLine x2 (-rIn) (-rOut)
-    
+
+    thinLine
+    flip mapM_ [x1, x1+10 .. x2] $ \ x ->
+        do xLine x rIn rOut
+           xLine x (-rIn) (-rOut)
 
 centerLine :: Render ()
 centerLine = do
@@ -127,5 +134,12 @@ thickLine :: Render ()
 thickLine = do
     setSourceRGB 0.3 0.3 0.3
     setLineWidth 2
+    setDash [] 0
+    setLineCap LineCapRound
+
+thinLine :: Render ()
+thinLine = do
+    setSourceRGB 0.7 0.7 0.7
+    setLineWidth 1
     setDash [] 0
     setLineCap LineCapRound
