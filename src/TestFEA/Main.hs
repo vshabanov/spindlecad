@@ -65,26 +65,25 @@ main = do
         n4 = xyc (u, 6, 7) (148, u, u)
         n5 = xyc (u, 8, 9) (500, u, u)
         n6 = xyc (u,10,11) (900, u, u)
---         cs = ring 0 100
---         rigidity = 120000 -- N/mm
---         scale = 3*10000000
-        cs = ring 0 600
-        rigidity = 200*120000 -- N/mm
-        scale = 500*10000000
+        cs = ring 0 100
+        rigidity = 120000 -- N/mm
+        scale = 3*10000000
+--         cs = ring 0 600
+--         rigidity = 200*120000 -- N/mm
+--         scale = 500*10000000
+--        beam = bernoulliEulerBeam2D
+        beam = timoshenkoBeam2D
         elements =
             [
-             bernoulliEulerBeam2D n1 n2 steel cs,
-             bernoulliEulerBeam2D n2 n3 steel cs,
-             bernoulliEulerBeam2D n3 n4 steel cs,
-             bernoulliEulerBeam2D n4 n5 steel cs,
-             bernoulliEulerBeam2D n5 n6 steel cs,
---              timoshenkoBeam2D n1 n2 steel cs,
---              timoshenkoBeam2D n2 n3 steel cs,
---              timoshenkoBeam2D n3 n4 steel cs,
---              timoshenkoBeam2D n4 n5 steel cs,
+             beam n1 n2 steel cs,
+             beam n2 n3 steel cs,
+             beam n3 n4 steel cs,
+             beam n4 n5 steel cs,
+             beam n5 n6 steel cs,
              linearYBearing n2 rigidity,
              linearYBearing n3 rigidity,
              linearYBearing n4 rigidity,
+--             linearYBearing n5 rigidity,
              linearYBearing n6 rigidity
             ]
         masterStiffness = assemble $ zip

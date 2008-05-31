@@ -13,13 +13,11 @@ module Elements.BernoulliEulerBeam2D (
     bernoulliEulerBeam2D,
     ) where
 
-import Graphics.Rendering.Cairo
-import Node
 import Element
-import ElementMatrix
+import Node
 import Material
 import CrossSection
-import Debug.Trace
+import Elements.TimoshenkoBeam2D
 
 -- | Currently Y & C components must be equal to zero. Force on X axis
 -- is ignored (1 in matrix diagonal).
@@ -27,122 +25,4 @@ import Debug.Trace
 -- component is equal to zero.
 bernoulliEulerBeam2D :: Node.XYC -> Node.XYC -> Material -> CrossSection -> E
 bernoulliEulerBeam2D n1 n2 mat cs =
-    linearElement
-    (matrix 4 $ map (ei/(l^3*(1+f))*)
-     [   12,         6*l,   -12,       6*l
-     ,  6*l,  l^2*(4+f),  -6*l,  l^2*(2-f)
-     ,  -12,       -6*l,    12,       -6*l
-     ,  6*l,  l^2*(2-f),  -6*l,  l^2*(4+f) ])
-    (fi [i2,i3,i5,i6])
-    (drawBeam f cs (x1, x2))
-    where l  = abs $ x2 - x1
-          ei = materialE mat * areaMomentOfInertia cs
-          f  = 12 * ei / (materialG mat * timoshenko_A_s mat cs * l^2)                
---          f  = 0
-          (x1, _, _) = xycCoords n1
-          (x2, _, _) = xycCoords n2
-          (i1, i2, i3) = xycFI n1
-          (i4, i5, i6) = xycFI n2
-
-drawBeam :: D -> CrossSection -> C2 -> RenderParameters -> [Node.C] -> Render ()
-drawBeam f cs (x1, x2) rp bold_u = do
-    let sc  = (* displacementsScale rp)
-        l   = abs $ x2 - x1
-        -- TODO: взять матрицу для балки Тимошенко, проверить,
-        -- сделать BernoulliEulerBeam2D частным случаем (materialG=0)
-        h_s = matrix 4 $ map (/60) [   30,  5*l,   30, -5*l
-                                   , -f36, -f3l,  f36, -f3l
-                                   ,    0, -5*l,    0,  5*l
-                                   ,   f6,  f3l,  -f6,  f3l
-                                   ]
-              where f3l = 3*l/(1+f)
-                    f36 = (36 + 30*f)/(1+f)
-                    f6  = 6/(1+f)
-        -- | Generalized coordinates [c_1, c_2, c_3, c_4]
-        c :: [D]
-        c   = vectorToList $ h_s `mulmv` vector 4 (map sc bold_u)
-        -- | Natural coordinate e <- [-1..1] = 2*x/l - 1
-        e x = 2*(x-x1)/(x2-x1) - 1
-        -- | Legendre polynomials (u interpolation)
-        legendre e = [ 1, e, 1/2*(3*e^2-1), 1/2*(5*e^3-3*e) ]
-        -- | First derivative with respect to x of Legendre
-        -- polynomials (v interpolation)
-        legendre' e = [ 0, 2/l, 6*e/l, 3*(5*e^2-1)/l ]
-        -- | Interpolation in generalized coordinates
-        interpolate l x = sum $ zipWith (*) c (l $ e x)
-        -- | Displacements field
---         u x y = -y * dy x  -- scales cross section diameter
---         v x y = interpolate legendre x
-        u x y = -y * sin (theta x) 
-        v x y = interpolate legendre x + y * (cos (theta x) - 1)
-        dy = interpolate legendre'
-        theta x = atan $ dy x + gamma
-        gamma = 10 * f / l * c!!3
-        -- | Displaced coodrinates
-        xy x y = (u x y + x, v x y + y)
-
---     trace (concat [show $ map sc bold_u, "\n",
---                    show c, "\n",
---                    show gamma, "\n",
---                    show $ v x1 0, "\n"]) centerLine
-
-    centerLine
-    moveTo x1 0
-    lineTo x2 0
-    stroke
-
-    let yLine y =
-            do uncurry moveTo $ xy x1 y
-               flip mapM_ [x1, x1+1 .. x2] $ \ x ->
-                   uncurry lineTo $ xy x y
-               uncurry lineTo $ xy x2 y
-               stroke
-        xLine x y1 y2 =
-            do uncurry moveTo $ xy x y1
-               uncurry lineTo $ xy x y2
-               stroke
---                uncurry moveTo $ kasat x (-50)
---                uncurry lineTo $ kasat x ( 50)
---                stroke
---         kasat x dx = (x + dx, (snd $ xy x 0) + dy x * dx)
-        rIn = dIn cs / 2
-        rOut = dOut cs / 2
-
-    thinLine
-    flip mapM_ [x1, x1+10 .. x2] $ \ x ->
-        do xLine x rIn rOut
-           xLine x (-rIn) (-rOut)
-
-    thickLine
-    yLine 0
-    yLine (-rOut)
-    yLine rOut
-    -- TODO: проверить численно осевую линию на совпадение
-    if rIn > 0
-       then do yLine (-rIn)
-               yLine rIn
-       else return ()
-
-    xLine x1 (-rOut) rOut
-    xLine x2 (-rOut) rOut
-
-centerLine :: Render ()
-centerLine = do
-    setSourceRGB 0.5 0.5 0.5
-    setLineWidth 1
-    setDash [25, 4, 8, 4] 0
-    setLineCap LineCapRound
-
-thickLine :: Render ()
-thickLine = do
-    setSourceRGB 0.3 0.3 0.3
-    setLineWidth 2
-    setDash [] 0
-    setLineCap LineCapRound
-
-thinLine :: Render ()
-thinLine = do
-    setSourceRGB 0.7 0.7 0.7
-    setLineWidth 1
-    setDash [] 0
-    setLineCap LineCapRound
+    timoshenkoBeam2D n1 n2 (mat { modulusOfRigidity = 1/0 }) cs
