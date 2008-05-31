@@ -5,9 +5,13 @@ float(y_1(210000, %pi*100^4/64, 800, 100, 120000, 120000))*1000; /* прогиб
 /* Chapter 12. Variational Formulation of Plane Beam Element */
 
 /* shape functions */
-Nbe(e) := matrix([ 1/4*(1-e)^2*(2+e), 1/8*l*(1-e)^2*(1+e), 1/4*(1+e)^2*(2-e), -1/8*l*(1+e)^2*(1-e)]);
+Nbe: matrix([ 1/4*(1-e)^2*(2+e), 1/8*l*(1-e)^2*(1+e), 1/4*(1+e)^2*(2-e), -1/8*l*(1+e)^2*(1-e)]);
+fortran(Nbe);
+Theta_be : factor(2/l*diff(Nbe, e, 1));
+fortran(Theta_be);
 
 Nbe : factor(Nbe(2*x/l-1));
+fortran(Nbe);
 
 /* curvature-displacement matrix */
 Bbe : factor(diff(Nbe, x, 2));
@@ -51,7 +55,12 @@ L(n,x) := factor(1/(2^n * n!)*diff((x^2-1)^n, x, n));
 Legendre(e) := matrix([ L(0,e), L(1,e), L(2,e), L(3,e) ]);
 
 Legendre(e);
+fortran(Legendre(e));
 L : subst(2*x/l - 1, e, Legendre(e));
+
+Ld1 : factor(2/l*diff(Legendre(e), e, 1));
+Ld1x : factor(diff(L, x, 1));
+factor(subst(2*x/l - 1, e, Ld1) - Ld1x);
 
 /* covariance matrices */
 Q(n) := integrate(transpose(diff(L,x,n)) . diff(L,x,n), x, 0, l);
