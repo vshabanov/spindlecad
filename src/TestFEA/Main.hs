@@ -43,7 +43,7 @@ main = do
     drawWindow <- widgetGetDrawWindow canvas
     onExpose canvas $ \x -> do (w,h) <- widgetGetSize canvas
                                renderWithDrawable drawWindow $
-                                   draw
+                                   draw scale
                                    elements
                                    (vectorToList displacements)
                                    (fromIntegral w) (fromIntegral h)
@@ -59,19 +59,25 @@ main = do
     print $ getv displacements 0
     print $ abs $ 1 / (getv displacements 0 * 1000)
   where u = undefined
-        n1 = xyc (u, 0, 1) (0  , u, u)
+        n1 = xyc (u, 0, 1) (  0, u, u)
         n2 = xyc (u, 2, 3) (100, u, u)
         n3 = xyc (u, 4, 5) (124, u, u)
         n4 = xyc (u, 6, 7) (148, u, u)
-        n5 = xyc (u, 8, 9) (900, u, u)
-        cs = ring 0 100
-        rigidity = 120000 -- N/mm
+        n5 = xyc (u, 8, 9) (500, u, u)
+        n6 = xyc (u,10,11) (900, u, u)
+--         cs = ring 0 100
+--         rigidity = 120000 -- N/mm
+--         scale = 3*10000000
+        cs = ring 0 600
+        rigidity = 200*120000 -- N/mm
+        scale = 500*10000000
         elements =
             [
              bernoulliEulerBeam2D n1 n2 steel cs,
              bernoulliEulerBeam2D n2 n3 steel cs,
              bernoulliEulerBeam2D n3 n4 steel cs,
              bernoulliEulerBeam2D n4 n5 steel cs,
+             bernoulliEulerBeam2D n5 n6 steel cs,
 --              timoshenkoBeam2D n1 n2 steel cs,
 --              timoshenkoBeam2D n2 n3 steel cs,
 --              timoshenkoBeam2D n3 n4 steel cs,
@@ -79,12 +85,12 @@ main = do
              linearYBearing n2 rigidity,
              linearYBearing n3 rigidity,
              linearYBearing n4 rigidity,
-             linearYBearing n5 rigidity
+             linearYBearing n6 rigidity
             ]
         masterStiffness = assemble $ zip
                           (map stiffnessMatrix elements)
                           (map freedomIndices elements)
-        masterForces = vector 10 ([-1] ++ replicate (10-1) 0)
+        masterForces = vector 12 ([-1] ++ replicate (12-1) 0)
         displacements = solve masterStiffness masterForces
 
 space = 10
@@ -101,13 +107,13 @@ vbox children = do
     flip mapM_ children $ \ widget -> boxPackStart b widget PackGrow 0
     return $ toWidget b
 
-draw :: [Element.E] -> [Node.C] -> Double -> Double -> Render ()
-draw elements displacements w h = withSavedMatrix $ do
+draw :: Double -> [Element.E] -> [Node.C] -> Double -> Double -> Render ()
+draw sc elements displacements w h = withSavedMatrix $ do
     let indexedDisplacements = zip [0..] displacements
         eltDisp elt = map (fromJust . flip lookup indexedDisplacements)
                       $ freedomIndices elt
         renderParameters = RenderParameters
-                           { displacementsScale = 3*10000000
+                           { displacementsScale = sc
                            }
     translate 100 (fromIntegral $ truncate $ h / 2)
     scale 1 (-1) -- flip Y

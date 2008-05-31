@@ -27,7 +27,6 @@ timoshenkoBeam2D n1 n2 mat cs =
     (matrix 4 $ map (ei/(l^3*(1+f))*)
      [   12,        6*l,   -12,        6*l
      ,  6*l,  l^2*(4+f),  -6*l,  l^2*(2-f)
-     ,    0,          0,     0,          0
      ,  -12,       -6*l,    12,       -6*l
      ,  6*l,  l^2*(2-f),  -6*l,  l^2*(4+f) ])
     (fi [i2,i3,i5,i6])

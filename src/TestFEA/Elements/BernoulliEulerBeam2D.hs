@@ -29,34 +29,38 @@ bernoulliEulerBeam2D :: Node.XYC -> Node.XYC -> Material -> CrossSection -> E
 bernoulliEulerBeam2D n1 n2 mat cs =
     linearElement
     (matrix 4 $ map (ei/(l^3*(1+f))*)
-     [  12,         6*l,   -12,        6*l
+     [   12,         6*l,   -12,       6*l
      ,  6*l,  l^2*(4+f),  -6*l,  l^2*(2-f)
      ,  -12,       -6*l,    12,       -6*l
      ,  6*l,  l^2*(2-f),  -6*l,  l^2*(4+f) ])
     (fi [i2,i3,i5,i6])
-    (drawBeam cs (x1, x2))
+    (drawBeam f cs (x1, x2))
     where l  = abs $ x2 - x1
           ei = materialE mat * areaMomentOfInertia cs
-          f = 0 -- 12 * ei / (materialG mat * timoshenko_A_s mat cs * l^2)                
+          f  = 12 * ei / (materialG mat * timoshenko_A_s mat cs * l^2)                
+--          f  = 0
           (x1, _, _) = xycCoords n1
           (x2, _, _) = xycCoords n2
           (i1, i2, i3) = xycFI n1
           (i4, i5, i6) = xycFI n2
 
-drawBeam :: CrossSection -> C2 -> RenderParameters -> [Node.C] -> Render ()
-drawBeam cs (x1, x2) rp bold_u = do
+drawBeam :: D -> CrossSection -> C2 -> RenderParameters -> [Node.C] -> Render ()
+drawBeam f cs (x1, x2) rp bold_u = do
     let sc  = (* displacementsScale rp)
         l   = abs $ x2 - x1
         -- TODO: взять матрицу для балки Тимошенко, проверить,
         -- сделать BernoulliEulerBeam2D частным случаем (materialG=0)
-        h_b = matrix 4 $ map (/60) [  30,  5*l,   30, -5*l
-                                   , -36, -3*l,   36, -3*l
-                                   ,   0, -5*l,    0,  5*l
-                                   ,   6,  3*l,   -6,  3*l
+        h_s = matrix 4 $ map (/60) [   30,  5*l,   30, -5*l
+                                   , -f36, -f3l,  f36, -f3l
+                                   ,    0, -5*l,    0,  5*l
+                                   ,   f6,  f3l,  -f6,  f3l
                                    ]
+              where f3l = 3*l/(1+f)
+                    f36 = (36 + 30*f)/(1+f)
+                    f6  = 6/(1+f)
         -- | Generalized coordinates [c_1, c_2, c_3, c_4]
         c :: [D]
-        c   = vectorToList $ h_b `mulmv` vector 4 (map sc bold_u)
+        c   = vectorToList $ h_s `mulmv` vector 4 (map sc bold_u)
         -- | Natural coordinate e <- [-1..1] = 2*x/l - 1
         e x = 2*(x-x1)/(x2-x1) - 1
         -- | Legendre polynomials (u interpolation)
@@ -72,13 +76,14 @@ drawBeam cs (x1, x2) rp bold_u = do
         u x y = -y * sin (theta x) 
         v x y = interpolate legendre x + y * (cos (theta x) - 1)
         dy = interpolate legendre'
-        theta x = atan $ dy x
+        theta x = atan $ dy x + gamma
+        gamma = 10 * f / l * c!!3
         -- | Displaced coodrinates
         xy x y = (u x y + x, v x y + y)
 
---     trace (concat [show bold_u, "\n",
+--     trace (concat [show $ map sc bold_u, "\n",
 --                    show c, "\n",
---                    show $ legendre (-1), "\n",
+--                    show gamma, "\n",
 --                    show $ v x1 0, "\n"]) centerLine
 
     centerLine
