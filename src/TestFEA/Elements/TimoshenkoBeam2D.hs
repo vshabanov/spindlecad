@@ -103,12 +103,26 @@ drawBeam f cs (x1, x2) rp bold_u = do
 --         kasat x dx = (x + dx, (snd $ xy x 0) + dy x * dx)
         rIn = dIn cs / 2
         rOut = dOut cs / 2
+        sectionDistance :: (Num a) => a
+        sectionDistance = 10
+        trunc :: Double -> Double
+        trunc x = fromIntegral (truncate x `div` sectionDistance) * sectionDistance
+        sections = [trunc x1, trunc x1 + sectionDistance .. x2]
 
-    thinLine
-    flip mapM_ [x1, x1+10 .. x2] $ \ x ->
+    -- center displacements
+    ultraLightLine
+    flip mapM_ sections $ \ x ->
+        do moveTo x 0
+           uncurry lineTo $ xy x 0
+           stroke
+
+    -- cross sections
+    lightLine
+    flip mapM_ sections $ \ x ->
         do xLine x rIn rOut
            xLine x (-rIn) (-rOut)
 
+    -- deformed beam contour
     thickLine
     yLine 0
     yLine (-rOut)

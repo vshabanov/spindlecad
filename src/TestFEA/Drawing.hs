@@ -10,11 +10,12 @@
 -- Various drawing utilities
 --
 module Drawing (
-    centerLine, thickLine, thinLine
+    centerLine, thickLine, thinLine, lightLine, ultraLightLine
     ) where
 
 import Graphics.Rendering.Cairo
 
+-- | Used as center line of symmetrical figures
 centerLine :: Render ()
 centerLine = do
     setSourceRGB 0.5 0.5 0.5
@@ -22,6 +23,7 @@ centerLine = do
     setDash [25, 4, 8, 4] 0
     setLineCap LineCapRound
 
+-- | Used as default line for figure boundaries
 thickLine :: Render ()
 thickLine = do
     setSourceRGB 0.3 0.3 0.3
@@ -29,9 +31,26 @@ thickLine = do
     setDash [] 0
     setLineCap LineCapRound
 
+-- | Line for figure boundaries inside figure
 thinLine :: Render ()
 thinLine = do
+    setSourceRGB 0.3 0.3 0.3
+    setLineWidth 1
+    setDash [] 0
+    setLineCap LineCapRound
+
+-- | Virtual lines (e.g. deformed cross sections)
+lightLine :: Render ()
+lightLine = do
     setSourceRGB 0.7 0.7 0.7
+    setLineWidth 1
+    setDash [] 0
+    setLineCap LineCapRound
+
+-- | Thin virtual lines (displacements)
+ultraLightLine :: Render ()
+ultraLightLine = do
+    setSourceRGB 0.9 0.9 0.9
     setLineWidth 1
     setDash [] 0
     setLineCap LineCapRound
