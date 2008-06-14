@@ -14,7 +14,6 @@ module Main (
 
 import Graphics.UI.Gtk
 import Graphics.Rendering.Cairo
-import System.Environment
 import Data.Maybe (fromJust)
 import Control.Monad
 import ElementMatrix
@@ -43,7 +42,7 @@ main = do
     drawWindow <- widgetGetDrawWindow canvas
     onExpose canvas $ \x -> do (w,h) <- widgetGetSize canvas
                                renderWithDrawable drawWindow $
-                                   draw scale
+                                   draw renderParameters
                                    elements
                                    (vectorToList displacements)
                                    (fromIntegral w) (fromIntegral h)
@@ -65,12 +64,20 @@ main = do
         n4 = xyc (u, 6, 7) (148, u, u)
         n5 = xyc (u, 8, 9) (500, u, u)
         n6 = xyc (u,10,11) (900, u, u)
-        cs = ring 0 100
-        rigidity = 120000 -- N/mm
-        scale = 3*10000000
---         cs = ring 0 600
---         rigidity = 200*120000 -- N/mm
---         scale = 500*10000000
+--         cs = ring 0 100
+--         rigidity :: (Num a) => a
+--         rigidity = 120000 -- N/mm
+--         renderParameters =
+--             RenderParameters
+--             { displacementsScale = 3*10000000
+--             }
+        cs = ring 0 600
+        rigidity :: (Num a) => a
+        rigidity = 200*120000 -- N/mm
+        renderParameters =
+            RenderParameters
+            { displacementsScale = 500*10000000
+            }
 --        beam = bernoulliEulerBeam2D
         beam = timoshenkoBeam2D
         elements =
@@ -88,32 +95,31 @@ main = do
             ]
         masterStiffness = assemble $ zip
                           (map stiffnessMatrix elements)
-                          (map freedomIndices elements)
+                          (map Element.freedomIndices elements)
         masterForces = vector 12 ([-1] ++ replicate (12-1) 0)
         displacements = solve masterStiffness masterForces
 
-space = 10
+-- space :: (Num a) => a
+-- space = 10
 
-hbox :: [Widget] -> IO Widget
-hbox children = do
-    b <- hBoxNew True space
-    flip mapM_ children $ \ widget -> boxPackStart b widget PackGrow 0
-    return $ toWidget b
+-- hbox :: [Widget] -> IO Widget
+-- hbox children = do
+--     b <- hBoxNew True space
+--     flip mapM_ children $ \ widget -> boxPackStart b widget PackGrow 0
+--     return $ toWidget b
 
-vbox :: [Widget] -> IO Widget
-vbox children = do
-    b <- vBoxNew True space
-    flip mapM_ children $ \ widget -> boxPackStart b widget PackGrow 0
-    return $ toWidget b
+-- vbox :: [Widget] -> IO Widget
+-- vbox children = do
+--     b <- vBoxNew True space
+--     flip mapM_ children $ \ widget -> boxPackStart b widget PackGrow 0
+--     return $ toWidget b
 
-draw :: Double -> [Element.E] -> [Node.C] -> Double -> Double -> Render ()
-draw sc elements displacements w h = withSavedMatrix $ do
-    let indexedDisplacements = zip [0..] displacements
+draw :: RenderParameters -> [Element.E] -> [Node.C] -> Double -> Double -> Render ()
+draw renderParameters elements displacements _w h = withSavedMatrix $ do
+    let indexedDisplacements :: [(ElementMatrix.I, Node.C)]
+        indexedDisplacements = zip [0..] displacements
         eltDisp elt = map (fromJust . flip lookup indexedDisplacements)
-                      $ freedomIndices elt
-        renderParameters = RenderParameters
-                           { displacementsScale = sc
-                           }
+                      $ Element.freedomIndices elt        
     translate 100 (fromIntegral $ truncate $ h / 2)
     scale 1 (-1) -- flip Y
     -- setAntialias AntialiasSubpixel

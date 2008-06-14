@@ -26,7 +26,7 @@ module Node (
     xyzabFI, xyzabCoords,
     ) where
 
-import ElementMatrix (I, D, FI)
+import ElementMatrix (I, D)
 
 -- | Two indices type
 type I2 = (I, I)

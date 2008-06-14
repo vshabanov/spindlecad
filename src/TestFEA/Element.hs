@@ -15,7 +15,7 @@ module Element (
     RenderParameters (..),
     ElementRender,
     -- * Creation
-    linearElement,
+    linear,
     -- * Queries
     freedomIndices, stiffnessMatrix, render,
 --    displacementsScale,
@@ -23,25 +23,25 @@ module Element (
     noRender
     ) where
 
-import ElementMatrix
-import Node
-import Graphics.Rendering.Cairo
+import qualified ElementMatrix
+import qualified Node
+import qualified Graphics.Rendering.Cairo as Cairo
 
 -- | Parameters necessary to render element
 data RenderParameters =
     RenderParameters
-    { displacementsScale :: D
+    { displacementsScale :: ElementMatrix.D
     }
 
 -- | Render element using render parameters and node displacements
-type ElementRender = RenderParameters -> [Node.C] -> Render ()
+type ElementRender = RenderParameters -> [Node.C] -> Cairo.Render ()
     -- TODO: тут пока передаем смещения, надо посмотреть,
 -- м.б. правильнее передавать координаты? будет понятно после
 -- реализации нелинейных элементов.
 
 -- | Empty element render
 noRender :: ElementRender
-noRender rp d = return ()
+noRender _rp _d = return ()
 
 -- | Finite element description
 data E =
@@ -56,8 +56,8 @@ data E =
     }         
 
 -- | Linear element creation, @linearElement stiffnessMatrix freedomIndices@
-linearElement :: ElementMatrix.M -> ElementMatrix.FI -> ElementRender -> E
-linearElement sm fi r =
+linear :: ElementMatrix.M -> ElementMatrix.FI -> ElementRender -> E
+linear sm fi r =
     E
     { freedomIndices = fi,
       stiffnessMatrix = sm,

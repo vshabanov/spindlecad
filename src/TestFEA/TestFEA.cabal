@@ -9,5 +9,6 @@ Build-Depends:       base, array, hmatrix, cairo, gtk
 
 Executable:          TestFEA
 Main-is:             Main.hs
-ghc-options:         -O
-
+ghc-options:         -O -Wall -Werror -fwarn-simple-patterns -fwarn-tabs -fwarn-incomplete-record-updates -fwarn-monomorphism-restriction
+-- -fwarn-implicit-prelude
+-- -fno-warn-unused-binds -fno-warn-unused-imports -fno-warn-name-shadowing

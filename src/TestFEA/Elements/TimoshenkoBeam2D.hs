@@ -15,38 +15,38 @@ module Elements.TimoshenkoBeam2D (
 
 import Graphics.Rendering.Cairo
 import Drawing
-import Node
-import Element
+import Node hiding (xy)
+import qualified Element
 import ElementMatrix
 import Material
 import CrossSection
-import Debug.Trace
+-- import Debug.Trace
 
 -- | Currently Y & C components must be equal to zero. Force on X axis
 -- is ignored (1 in matrix diagonal).
 -- Actually it's the same code as timoshenkoBeam2D except /f/
 -- component is equal to zero.
-timoshenkoBeam2D :: Node.XYC -> Node.XYC -> Material -> CrossSection -> E
+timoshenkoBeam2D :: Node.XYC -> Node.XYC -> Material -> CrossSection -> Element.E
 timoshenkoBeam2D n1 n2 mat cs =
-    linearElement
+    Element.linear
     (matrix 4 $ map (ei/(l^3*(1+f))*)
-     [   12,         6*l,   -12,       6*l
-     ,  6*l,  l^2*(4+f),  -6*l,  l^2*(2-f)
-     ,  -12,       -6*l,    12,       -6*l
-     ,  6*l,  l^2*(2-f),  -6*l,  l^2*(4+f) ])
-    (fi [i2,i3,i5,i6])
+     [   12 ,        6*l ,   -12 ,        6*l
+     ,   6*l,   l^2*(4+f),   -6*l,   l^2*(2-f)
+     ,  -12 ,       -6*l ,    12 ,       -6*l
+     ,   6*l,   l^2*(2-f),   -6*l,   l^2*(4+f) ])
+    (freedomIndices [i2,i3,i5,i6])
     (drawBeam f cs (x1, x2))
     where l  = abs $ x2 - x1
           ei = materialE mat * areaMomentOfInertia cs
           f  = 12 * ei / (materialG mat * timoshenko_A_s mat cs * l^2)                
           (x1, _, _) = xycCoords n1
           (x2, _, _) = xycCoords n2
-          (i1, i2, i3) = xycFI n1
-          (i4, i5, i6) = xycFI n2
+          (_i1, i2, i3) = xycFI n1
+          (_i4, i5, i6) = xycFI n2
 
-drawBeam :: D -> CrossSection -> C2 -> RenderParameters -> [Node.C] -> Render ()
+drawBeam :: D -> CrossSection -> C2 -> Element.RenderParameters -> [Node.C] -> Render ()
 drawBeam f cs (x1, x2) rp bold_u = do
-    let sc  = (* displacementsScale rp)
+    let sc  = (* Element.displacementsScale rp)
         l   = abs $ x2 - x1
         h_s = matrix 4 $ map (/60) [   30,  5*l,   30, -5*l
                                    , -f36, -f3l,  f36, -f3l
@@ -59,15 +59,15 @@ drawBeam f cs (x1, x2) rp bold_u = do
         -- | Generalized coordinates [c_1, c_2, c_3, c_4]
         c :: [D]
         c   = vectorToList $ h_s `mulmv` vector 4 (map sc bold_u)
-        -- | Natural coordinate e <- [-1..1] = 2*x/l - 1
-        e x = 2*(x-x1)/(x2-x1) - 1
+        -- | Natural coordinate \xi <- [-1..1] = 2*x/l - 1
+        xi x = 2*(x-x1)/(x2-x1) - 1
         -- | Legendre polynomials (u interpolation)
         legendre e = [ 1, e, 1/2*(3*e^2-1), 1/2*(5*e^3-3*e) ]
         -- | First derivative with respect to x of Legendre
         -- polynomials (v interpolation)
         legendre' e = [ 0, 2/l, 6*e/l, 3*(5*e^2-1)/l ]
         -- | Interpolation in generalized coordinates
-        interpolate l x = sum $ zipWith (*) c (l $ e x)
+        interpolate poly x = sum $ zipWith (*) c (poly $ xi x)
         -- | Displacements field
         u x y = -y * sin (theta x) 
         v x y = interpolate legendre x + y * (cos (theta x) - 1)
@@ -81,11 +81,6 @@ drawBeam f cs (x1, x2) rp bold_u = do
 --                    show c, "\n",
 --                    show gamma, "\n",
 --                    show $ v x1 0, "\n"]) centerLine
-
-    centerLine
-    moveTo x1 0
-    lineTo x2 0
-    stroke
 
     let yLine y =
             do uncurry moveTo $ xy x1 y
@@ -108,6 +103,12 @@ drawBeam f cs (x1, x2) rp bold_u = do
         trunc :: Double -> Double
         trunc x = fromIntegral (truncate x `div` sectionDistance) * sectionDistance
         sections = [trunc x1, trunc x1 + sectionDistance .. x2]
+
+    -- axis
+    centerLine
+    moveTo x1 0
+    lineTo x2 0
+    stroke
 
     -- center displacements
     ultraLightLine

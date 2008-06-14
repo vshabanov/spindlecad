@@ -14,16 +14,14 @@ module Elements.Bearing1D (
     ) where
 
 import Node
-import Element
+import qualified Element
 import ElementMatrix
-import Material
-import CrossSection
 
 -- | Y only bearing @linearYBearing node rigidity[N/mm]@.
-linearYBearing :: Node.XYC -> D -> E
+linearYBearing :: Node.XYC -> D -> Element.E
 linearYBearing node rigidity =
-    linearElement
+    Element.linear
     (matrix 1 [rigidity])
-    (fi [i2])
-    noRender
-    where (i1, i2, i3) = xycFI node
+    (freedomIndices [i2])
+    Element.noRender
+    where (_i1, i2, _i3) = xycFI node

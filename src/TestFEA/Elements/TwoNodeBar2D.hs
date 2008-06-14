@@ -14,22 +14,22 @@ module Elements.TwoNodeBar2D (
     ) where
 
 import Node
-import Element
+import qualified Element
 import ElementMatrix
 import Material
 import CrossSection
 
 -- | 
-twoNodeBar2D :: Node.XY -> Node.XY -> Material -> CrossSection -> E
+twoNodeBar2D :: Node.XY -> Node.XY -> Material -> CrossSection -> Element.E
 twoNodeBar2D n1 n2 mat cs =
-    linearElement
+    Element.linear
     (matrix 4 $ map (materialE mat * area cs / l *)
      [  c^2,  c*s, -c^2, -c*s
      ,  c*s,  s^2, -s*c, -s^2
      , -c^2, -s*c,  c^2,  s*c
      , -s*c, -s^2,  s*c,  s^2 ])
-    (fi [i1,i2,i3,i4])
-    noRender
+    (freedomIndices [i1,i2,i3,i4])
+    Element.noRender
     where l  = sqrt $ dx^2 + dy^2
           dx = x2 - x1
           dy = y2 - y1

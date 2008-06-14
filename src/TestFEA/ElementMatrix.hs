@@ -18,7 +18,7 @@ module ElementMatrix (
     FI,
     -- * Functions
     -- ** Creation
-    matrix, vector, fi,
+    matrix, vector, freedomIndices,
     -- ** Printing
     disp, dispv,
     -- ** Assembly
@@ -31,7 +31,7 @@ module ElementMatrix (
     get, getv, vectorToList
     ) where
 
-import Numeric.LinearAlgebra as LA
+import Numeric.LinearAlgebra as LA hiding (i)
 import Text.Printf
 import Control.Monad
 import Control.Monad.ST
@@ -65,8 +65,8 @@ vectorToList :: V -> [D]
 vectorToList v = toList v
 
 -- | Makes freedom indices list.
-fi :: (Integral a, Num a) => [a] -> FI
-fi x = map fromIntegral x
+freedomIndices :: (Integral a, Num a) => [a] -> FI
+freedomIndices x = map fromIntegral x
 
 -- | Display matrix.
 disp :: M -> IO ()
@@ -129,16 +129,16 @@ type STMatrix s = STArray s Int (STArray s Int D)
 -- одномерным и хранить кол-во байт в строке.
 
 stMatrixOfList :: [[D]] -> ST s (STMatrix s)
-stMatrixOfList l = do rows <- mapM (\ r -> newListArray (0, length r - 1) r) l
-                      newListArray (0, length rows - 1) rows
+stMatrixOfList l = do mrows <- mapM (\ r -> newListArray (0, length r - 1) r) l
+                      newListArray (0, length mrows - 1) mrows
 
 stMatrix :: M -> ST s (STMatrix s)
 stMatrix = stMatrixOfList . toLists
 
 laMatrix :: STMatrix s -> ST s M
 laMatrix m = do stRows <- getElems m
-                rows <- mapM getElems stRows
-                return $ fromLists rows
+                mrows <- mapM getElems stRows
+                return $ fromLists mrows
 
 -- laVector :: STMatrix s -> ST s (LA.Vector D)
 -- laVector m = laMatrix m >>= (head . toColumns)
@@ -153,5 +153,5 @@ modifySTMatrix c r f m = do row <- readArray m r
                             e <- readArray row c
                             writeArray row c (f e)
 
-writeSTMatrix :: Int -> Int -> D -> STMatrix s -> ST s ()
-writeSTMatrix c r e m = modifySTMatrix c r (\ _ -> e) m
+-- writeSTMatrix :: Int -> Int -> D -> STMatrix s -> ST s ()
+-- writeSTMatrix c r e m = modifySTMatrix c r (\ _ -> e) m
