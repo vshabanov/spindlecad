@@ -14,7 +14,6 @@ module Main (
 
 import Graphics.UI.Gtk
 import Graphics.Rendering.Cairo
-import Data.Maybe (fromJust)
 import Control.Monad
 import ElementMatrix
 import Material
@@ -42,9 +41,9 @@ main = do
     drawWindow <- widgetGetDrawWindow canvas
     onExpose canvas $ \x -> do (w,h) <- widgetGetSize canvas
                                renderWithDrawable drawWindow $
-                                   draw renderParameters
-                                   elements
-                                   (vectorToList displacements)
+                                   draw 
+                                   (render element renderParameters $
+                                    vectorToList displacements)
                                    (fromIntegral w) (fromIntegral h)
                                return $ eventSent x
 --     tlt <- tooltipsNew
@@ -62,7 +61,7 @@ main = do
         n2 = xyc (u, 2, 3) (100, u, u)
         n3 = xyc (u, 4, 5) (124, u, u)
         n4 = xyc (u, 6, 7) (148, u, u)
-        n5 = xyc (u, 8, 9) (500, u, u)
+        n5 = xyc (u, 8, 9) (300, u, u)
         n6 = xyc (u,10,11) (900, u, u)
 --         cs = ring 0 100
 --         rigidity :: (Num a) => a
@@ -80,7 +79,7 @@ main = do
             }
 --        beam = bernoulliEulerBeam2D
         beam = timoshenkoBeam2D
-        elements =
+        element = composite
             [
              beam n1 n2 steel cs,
              beam n2 n3 steel cs,
@@ -90,13 +89,13 @@ main = do
              linearYBearing n2 rigidity,
              linearYBearing n3 rigidity,
              linearYBearing n4 rigidity,
---             linearYBearing n5 rigidity,
+             linearYBearing n5 rigidity,
              linearYBearing n6 rigidity
             ]
-        masterStiffness = assemble $ zip
-                          (map stiffnessMatrix elements)
-                          (map Element.freedomIndices elements)
+        masterStiffness = stiffnessMatrix element [0, 0..]
         masterForces = vector 12 ([-1] ++ replicate (12-1) 0)
+        -- TODO: силы также надо описывать по нодам, 
+        -- сила -- это { freedomIndex :: I, force :: {- C -> ? -} D }
         displacements = solve masterStiffness masterForces
 
 -- space :: (Num a) => a
@@ -114,22 +113,12 @@ main = do
 --     flip mapM_ children $ \ widget -> boxPackStart b widget PackGrow 0
 --     return $ toWidget b
 
-draw :: RenderParameters -> [Element.E] -> [Node.C] -> Double -> Double -> Render ()
-draw renderParameters elements displacements _w h = withSavedMatrix $ do
-    let indexedDisplacements :: [(ElementMatrix.I, Node.C)]
-        indexedDisplacements = zip [0..] displacements
-        eltDisp elt = map (fromJust . flip lookup indexedDisplacements)
-                      $ Element.freedomIndices elt        
+draw :: Render () -> Double -> Double -> Render ()
+draw drawing _w h = withSavedMatrix $ do
     translate 100 (fromIntegral $ truncate $ h / 2)
     scale 1 (-1) -- flip Y
     -- setAntialias AntialiasSubpixel
-    mapM_ (\ elt -> render elt renderParameters (eltDisp elt)) elements
-    -- TODO: сделать передачу координат из displacements 
-    -- по freedomIndices и сделать отрисовку BernoulliEulerBeam2d по
-    -- её shape functions и посмотреть как отрисовать балку
-    -- Тимошенко (должна показывать еще и поперечные смещения,
-    -- какое-то дополнительное преобразование для shape functions или
-    -- вообще другие shape functions?)
+    drawing
 
 withSavedMatrix :: Render () -> Render ()
 withSavedMatrix r = do

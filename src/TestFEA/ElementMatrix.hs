@@ -22,6 +22,7 @@ module ElementMatrix (
     -- ** Printing
     disp, dispv,
     -- ** Assembly
+    mergeFIs,
     assemble,
     -- ** Solution
     solve,
@@ -36,6 +37,8 @@ import Text.Printf
 import Control.Monad
 import Control.Monad.ST
 import Data.Array.ST
+import Data.List
+import Data.Maybe
 
 -- | Matrix element type.
 type D = Double
@@ -60,7 +63,7 @@ matrix n e = (n><n) e
 vector :: Int -> [D] -> V
 vector n e = n |> e
 
--- | 
+-- | Yep, converts vector to list
 vectorToList :: V -> [D]
 vectorToList v = toList v
 
@@ -92,16 +95,27 @@ get m a b = m @@> (a, b)
 getv :: V -> I -> D
 getv v i = v @> i
 
+-- | Merge several freedom indices lists into one, sorted and unique
+mergeFIs :: [FI] -> FI
+mergeFIs = sort . foldl union []
+
 -- | Element matrices assembling.
 -- Uses list of matrices and degrees of freedom indices to assemble
 -- master matrix.
-assemble :: [(M, FI)] -> M
-assemble kes = runST $ do
-    k <- zeroSquareMatrix size
-    m <- mapM (\ (ke, eftab) -> stMatrix ke >>= \ s -> return (s, eftab)) kes
-    assemble' m k
-    laMatrix k
-  where size = (maximum $ map (\ (_, eftab) -> maximum eftab) kes) + 1
+assemble :: [(M, FI)] -> (M, FI)
+assemble eK'Ftabs = (masterMatrix, masterFtab)
+  where (eK, eFtab) = (fst, snd)
+        masterMatrix = runST $ do
+            masterK <- zeroSquareMatrix size
+            m <- mapM (\ e -> do stm <- stMatrix (eK e)
+                                 return (stm, indexes $ eFtab e)) eK'Ftabs
+            assemble' m masterK
+            laMatrix masterK
+        masterFtab = mergeFIs $ map eFtab eK'Ftabs
+        size = length masterFtab
+        fiToIndex :: [(I, Int)]
+        fiToIndex = zip masterFtab [0..]
+        indexes eftab = map (fromJust . flip lookup fiToIndex) eftab
 
 zeroSquareMatrix :: Int -> ST s (STMatrix s)
 zeroSquareMatrix n = stMatrixOfList $ take n $ repeat (take n $ repeat 0)

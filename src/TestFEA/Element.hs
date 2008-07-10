@@ -15,10 +15,9 @@ module Element (
     RenderParameters (..),
     ElementRender,
     -- * Creation
-    linear,
+    linear, nonlinear, composite,
     -- * Queries
     freedomIndices, stiffnessMatrix, render,
---    displacementsScale,
     -- * Utils
     noRender
     ) where
@@ -26,6 +25,8 @@ module Element (
 import qualified ElementMatrix
 import qualified Node
 import qualified Graphics.Rendering.Cairo as Cairo
+import Data.List
+import Data.Maybe
 
 -- | Parameters necessary to render element
 data RenderParameters =
@@ -47,19 +48,43 @@ noRender _rp _d = return ()
 data E =
     E
     { freedomIndices :: ElementMatrix.FI,
-      -- TODO: м.б. здесь ноды оставить, а не индексы?
-      -- для описания элемента наверное проще ноды
-      -- а для общей работы проще индексы
-      -- потом посмотрим, чего больше и, возможно, переделаем.
-      stiffnessMatrix :: ElementMatrix.M,
+      stiffnessMatrix :: [Node.C] -> ElementMatrix.M,
       render :: ElementRender
     }         
 
--- | Linear element creation, @linearElement stiffnessMatrix freedomIndices@
+-- | Linear element creation,
+-- @linear stiffnessMatrix freedomIndices renderer@
 linear :: ElementMatrix.M -> ElementMatrix.FI -> ElementRender -> E
 linear sm fi r =
+    nonlinear (\ _ -> sm) fi r
+
+-- | Non-linear element creation, stiffness matrix depends on node
+-- displacements (which are in the same order as freedom indices list).
+nonlinear :: ([Node.C] -> ElementMatrix.M) -> ElementMatrix.FI
+          -> ElementRender -> E
+nonlinear sm fi r =
     E
     { freedomIndices = fi,
       stiffnessMatrix = sm,
       render = r
     }
+
+-- | Composite element
+composite :: [E] -> E
+composite elts =
+    E
+    { freedomIndices = fis,
+      stiffnessMatrix = \ nc ->
+          fst $ ElementMatrix.assemble $
+              zip (mapnc nc stiffnessMatrix elts)
+                  (map freedomIndices elts),
+      render = \ rp nc ->
+          sequence_ $ mapnc nc (\ elt nc' -> render elt rp nc') elts
+    }
+    where fis = ElementMatrix.mergeFIs $ map freedomIndices elts
+          -- | map which remaps composite element node displacements to
+          -- element's node displacements
+          mapnc nc f = map (\ elt -> f elt (nc' elt))
+              where fiToNC = zip fis nc
+                    nc' elt = map (fromJust . flip lookup fiToNC) $
+                              freedomIndices elt
